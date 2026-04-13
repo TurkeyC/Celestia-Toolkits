@@ -174,13 +174,7 @@ void app_preview_render_selected_filename(PixelTermApp *app) {
     }
     gchar *display_name = truncate_utf8_middle_keep_suffix(safe, max_width);
     gint row = app->term_height - 2;
-    gint name_len = utf8_display_width(display_name);
-    gint pad = (app->term_width > name_len) ? (app->term_width - name_len) / 2 : 0;
-    printf("\033[%d;1H", row);
-    for (gint i = 0; i < app->term_width; i++) putchar(' ');
-    if (name_len > 0) {
-        printf("\033[%d;%dH\033[34m%s\033[0m", row, pad + 1, display_name);
-    }
+    ui_render_centered_row(row, app->term_width, display_name, "\033[34m");
     g_free(display_name);
     g_free(safe);
     g_free(base);

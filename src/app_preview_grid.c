@@ -6,12 +6,12 @@
 #include "ui_render_utils.h"
 
 static PreviewLayout app_preview_calculate_layout(PixelTermApp *app) {
-    PreviewLayout layout = {1, 1, app ? app->term_width : 80, 10, 3, 1};
+    PreviewLayout layout = {1, 1, app ? app->term_width : 80, 10, ui_preview_header_lines(app), 1};
     if (!app || app->total_images <= 0) {
         return layout;
     }
 
-    const gint header_lines = app->ui_text_hidden ? 0 : 3;
+    const gint header_lines = ui_preview_header_lines(app);
     gint usable_width = app->term_width > 0 ? app->term_width : 80;
     gint bottom_reserved = app_preview_bottom_reserved_lines(app);
     gint usable_height = app->term_height > header_lines + bottom_reserved
@@ -685,15 +685,8 @@ ErrorCode app_render_preview_grid(PixelTermApp *app) {
     }
 
     if (!app->ui_text_hidden) {
-        // Header: title + page indicator on row 2; keep 3 header lines total
-        const char *title = "Preview Grid";
-        gint title_len = strlen(title);
-        gint pad = (app->term_width > title_len) ? (app->term_width - title_len) / 2 : 0;
-        printf("\033[1;1H\033[2K");
-        for (gint i = 0; i < pad; i++) putchar(' ');
-        printf("%s", title);
+        ui_render_centered_row(1, app->term_width, "Preview Grid", NULL);
 
-        // Row 3: Page indicator centered (numbers only)
         gint rows_per_page = layout.visible_rows > 0 ? layout.visible_rows : 1;
         gint total_pages = (layout.rows + rows_per_page - 1) / rows_per_page;
         if (total_pages < 1) total_pages = 1;
@@ -702,14 +695,8 @@ ErrorCode app_render_preview_grid(PixelTermApp *app) {
         if (current_page > total_pages) current_page = total_pages;
         char page_text[32];
         g_snprintf(page_text, sizeof(page_text), "%d/%d", current_page, total_pages);
-        gint page_len = (gint)strlen(page_text);
-        gint page_pad = (app->term_width > page_len) ? (app->term_width - page_len) / 2 : 0;
-        printf("\033[3;1H\033[2K");
-        for (gint i = 0; i < page_pad; i++) putchar(' ');
-        printf("%s", page_text);
-
-        // Row 2: spacer
-        printf("\033[2;1H\033[2K");
+        ui_render_centered_row(2, app->term_width, "", NULL);
+        ui_render_centered_row(3, app->term_width, page_text, NULL);
     }
 
     gint start_row = app->preview.scroll;

@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "ui_render_utils.h"
 #include "app_preview_shared_internal.h"
 
 typedef void (*PreviewDrawFunc)(gpointer user_data);
@@ -18,6 +19,13 @@ typedef struct {
     gboolean graphics_mode;
     GString *rendered;
 } PreviewCaptureArgs;
+
+typedef struct {
+    gint row;
+    gint term_width;
+    const char *text;
+    const char *style;
+} UiRowCaptureArgs;
 
 static gchar *capture_output(PreviewDrawFunc draw_func, gpointer user_data) {
     gchar *template = g_strdup_printf("%s/pixelterm-preview-shared-XXXXXX", g_get_tmp_dir());
@@ -76,6 +84,11 @@ static void draw_preview_content_capture(gpointer user_data) {
                              args->rendered_height,
                              args->graphics_mode,
                              args->rendered);
+}
+
+static void draw_centered_row_capture(gpointer user_data) {
+    UiRowCaptureArgs *args = (UiRowCaptureArgs *)user_data;
+    ui_render_centered_row(args->row, args->term_width, args->text, args->style);
 }
 
 static gchar *capture_draw_output(gint content_x,
@@ -137,6 +150,19 @@ static gchar *capture_preview_content_output(gint content_x,
     gchar *output = capture_output(draw_preview_content_capture, &args);
     g_string_free(args.rendered, TRUE);
     return output;
+}
+
+static gchar *capture_centered_row_output(gint row,
+                                          gint term_width,
+                                          const char *text,
+                                          const char *style) {
+    UiRowCaptureArgs args = {
+        .row = row,
+        .term_width = term_width,
+        .text = text,
+        .style = style
+    };
+    return capture_output(draw_centered_row_capture, &args);
 }
 
 static void test_draw_rendered_lines_centers_both_axes(void) {
@@ -210,6 +236,35 @@ static void test_draw_preview_content_uses_graphics_path_for_graphics_mode(void)
     g_free(output);
 }
 
+static void test_ui_render_centered_row_centers_and_styles_text(void) {
+    gchar *output = capture_centered_row_output(3, 20, "Preview Grid", "\033[34m");
+
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[3;1H\033[2K    \033[34mPreview Grid\033[0m"));
+    g_free(output);
+}
+
+static void test_ui_single_view_layout_contract_is_stable(void) {
+    PixelTermApp app = {0};
+    app.ui_text_hidden = FALSE;
+
+    g_assert_cmpint(ui_single_view_content_top_row(&app), ==, 4);
+    g_assert_cmpint(ui_single_view_bottom_reserved_lines(&app), ==, 3);
+
+    app.ui_text_hidden = TRUE;
+    g_assert_cmpint(ui_single_view_content_top_row(&app), ==, 4);
+    g_assert_cmpint(ui_single_view_bottom_reserved_lines(&app), ==, 3);
+}
+
+static void test_ui_preview_header_lines_follow_visibility(void) {
+    PixelTermApp app = {0};
+
+    app.ui_text_hidden = FALSE;
+    g_assert_cmpint(ui_preview_header_lines(&app), ==, 3);
+
+    app.ui_text_hidden = TRUE;
+    g_assert_cmpint(ui_preview_header_lines(&app), ==, 0);
+}
+
 void register_preview_shared_tests(void) {
     g_test_add_func("/preview_shared/draw_rendered_lines/centers_both_axes",
                     test_draw_rendered_lines_centers_both_axes);
@@ -223,4 +278,10 @@ void register_preview_shared_tests(void) {
                     test_draw_preview_content_uses_text_path_for_symbol_mode);
     g_test_add_func("/preview_shared/draw_preview_content/uses_graphics_path_for_graphics_mode",
                     test_draw_preview_content_uses_graphics_path_for_graphics_mode);
+    g_test_add_func("/preview_shared/ui_render/centered_row_centers_and_styles_text",
+                    test_ui_render_centered_row_centers_and_styles_text);
+    g_test_add_func("/preview_shared/ui_render/single_view_layout_contract_is_stable",
+                    test_ui_single_view_layout_contract_is_stable);
+    g_test_add_func("/preview_shared/ui_render/preview_header_lines_follow_visibility",
+                    test_ui_preview_header_lines_follow_visibility);
 }

@@ -2,6 +2,32 @@
 
 #include "text_utils.h"
 
+void ui_render_centered_row(gint row, gint term_width, const char *text, const char *style) {
+    if (row <= 0 || term_width <= 0) {
+        return;
+    }
+
+    gchar *safe = sanitize_for_terminal(text ? text : "");
+    gchar *display = truncate_utf8_for_display(safe, term_width);
+    gint text_width = utf8_display_width(display);
+    gint pad = (term_width > text_width) ? (term_width - text_width) / 2 : 0;
+
+    printf("\033[%d;1H\033[2K", row);
+    for (gint i = 0; i < pad; i++) {
+        putchar(' ');
+    }
+    if (display[0] != '\0') {
+        if (style) {
+            printf("%s%s\033[0m", style, display);
+        } else {
+            printf("%s", display);
+        }
+    }
+
+    g_free(display);
+    g_free(safe);
+}
+
 gint ui_filename_max_width(const PixelTermApp *app) {
     if (!app || app->term_width <= 0) {
         return 0;
@@ -14,6 +40,20 @@ gint ui_filename_max_width(const PixelTermApp *app) {
         limit = 1;
     }
     return limit;
+}
+
+gint ui_single_view_content_top_row(const PixelTermApp *app) {
+    (void)app;
+    return 4;
+}
+
+gint ui_single_view_bottom_reserved_lines(const PixelTermApp *app) {
+    (void)app;
+    return 3;
+}
+
+gint ui_preview_header_lines(const PixelTermApp *app) {
+    return (app && app->ui_text_hidden) ? 0 : 3;
 }
 
 static gint ui_help_segments_visible_width(const HelpSegment *segments, gsize n) {

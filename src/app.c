@@ -2,6 +2,7 @@
 
 #include "app.h"
 #include "preload_control.h"
+#include "ui_render_utils.h"
 
 static const gdouble k_book_spread_ratio = 1.0;
 static const gint k_book_spread_min_cols = 120;
@@ -135,10 +136,9 @@ void app_get_image_target_dimensions(const PixelTermApp *app, gint *max_width, g
     }
     gint width = (app && app->term_width > 0) ? app->term_width : 80;
     gint height = (app && app->term_height > 0) ? app->term_height : 24;
-    // Single view reserves: title (row 1), spacer (row 2), index (row 3),
-    // filename (row -2), spacer (row -1), footer (row -0).
-    // Keep image position/size stable even when the info overlay is visible.
-    height -= 6;
+    // Single-view layout keeps the render area stable under a fixed top header
+    // and bottom filename/footer reserve, even when UI text is hidden.
+    height -= (ui_single_view_content_top_row(app) - 1) + ui_single_view_bottom_reserved_lines(app);
     if (height < 1) {
         height = 1;
     }

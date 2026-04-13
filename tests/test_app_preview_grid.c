@@ -1,6 +1,9 @@
 #include <glib.h>
+#include <glib/gstdio.h>
 
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "app.h"
 #include "app_preview_render_internal.h"
@@ -11,6 +14,8 @@ typedef struct {
     gint term_width;
     gint term_height;
 } PreviewGridStubState;
+
+typedef void (*PreviewGridCaptureFunc)(gpointer user_data);
 
 static PreviewGridStubState g_preview_grid_stub_state;
 
@@ -56,6 +61,38 @@ static void cleanup_preview_app(PixelTermApp *app) {
     app->total_images = 0;
     app->preview.selected_link = NULL;
     app->preview.selected_link_index = -1;
+}
+
+static gchar *capture_output(PreviewGridCaptureFunc draw_func, gpointer user_data) {
+    gchar *template = g_strdup_printf("%s/pixelterm-preview-grid-XXXXXX", g_get_tmp_dir());
+    int fd = g_mkstemp(template);
+    g_assert_cmpint(fd, >=, 0);
+
+    int saved_stdout = dup(STDOUT_FILENO);
+    g_assert_cmpint(saved_stdout, >=, 0);
+
+    fflush(stdout);
+    g_assert_cmpint(dup2(fd, STDOUT_FILENO), >=, 0);
+    close(fd);
+
+    draw_func(user_data);
+
+    fflush(stdout);
+    g_assert_cmpint(dup2(saved_stdout, STDOUT_FILENO), >=, 0);
+    close(saved_stdout);
+
+    gchar *output = NULL;
+    GError *error = NULL;
+    g_assert_true(g_file_get_contents(template, &output, NULL, &error));
+    g_assert_no_error(error);
+    g_remove(template);
+    g_free(template);
+    return output;
+}
+
+static void render_preview_grid_capture(gpointer user_data) {
+    PixelTermApp *app = (PixelTermApp *)user_data;
+    g_assert_cmpint(app_render_preview_grid(app), ==, ERROR_NONE);
 }
 
 static void test_move_selection_normalizes_selection_and_scroll_before_moving(void) {
@@ -279,6 +316,30 @@ static void test_page_move_round_trip_uses_clamped_column_on_partial_final_row(v
     cleanup_preview_app(&app);
 }
 
+static void test_render_preview_grid_preserves_visible_layout_contract(void) {
+    PixelTermApp app;
+
+    init_preview_app(&app, 6, 40, 80, 30);
+    app.ui_text_hidden = FALSE;
+    app.preview.selected = 4;
+    app.preview.scroll = 2;
+
+    gchar *output = capture_output(render_preview_grid_capture, &app);
+
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[1;1H\033[2K"));
+    g_assert_nonnull(g_strstr_len(output, -1, "Preview Grid"));
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[3;1H\033[2K"));
+    g_assert_nonnull(g_strstr_len(output, -1, "3/3"));
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[28;1H"));
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[34mimg-4\033[0m"));
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[30;1H\033[2K"));
+    g_assert_nonnull(g_strstr_len(output, -1, "Enter"));
+    g_assert_nonnull(g_strstr_len(output, -1, "Open"));
+
+    g_free(output);
+    cleanup_preview_app(&app);
+}
+
 ImageRenderer* app_create_grid_renderer(const PixelTermApp *app,
                                         gint content_width,
                                         gint content_height,
@@ -356,7 +417,14 @@ void app_preview_render_cells(const GridRenderContext *context,
 }
 
 void app_preview_render_selected_filename(PixelTermApp *app) {
-    (void)app;
+    const gchar *filepath = app_preview_get_selected_filepath(app);
+    if (!app || app->ui_text_hidden || !filepath) {
+        return;
+    }
+
+    gchar *basename = g_path_get_basename(filepath);
+    ui_render_centered_row(app->term_height - 2, app->term_width, basename, "\033[34m");
+    g_free(basename);
 }
 
 ErrorCode app_transition_mode(PixelTermApp *app, AppMode mode) {
@@ -403,23 +471,6 @@ void renderer_destroy(ImageRenderer *renderer) {
     g_free(renderer);
 }
 
-void ui_clear_screen_for_refresh(const PixelTermApp *app) {
-    (void)app;
-}
-
-void ui_end_sync_update(void) {
-}
-
-void ui_print_centered_help_line(gint row,
-                                 gint term_width,
-                                 const HelpSegment *segments,
-                                 gsize n) {
-    (void)row;
-    (void)term_width;
-    (void)segments;
-    (void)n;
-}
-
 ErrorCode video_player_stop(VideoPlayer *player) {
     (void)player;
     return ERROR_NONE;
@@ -452,6 +503,8 @@ int main(int argc, char **argv) {
                     test_page_move_clamps_top_slot_on_short_last_page_after_render);
     g_test_add_func("/app_preview_grid/page_move/round_trip_uses_clamped_column_on_partial_final_row",
                     test_page_move_round_trip_uses_clamped_column_on_partial_final_row);
+    g_test_add_func("/app_preview_grid/render_preview_grid/preserves_visible_layout_contract",
+                    test_render_preview_grid_preserves_visible_layout_contract);
 
     return g_test_run();
 }

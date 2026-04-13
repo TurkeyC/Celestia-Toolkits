@@ -50,14 +50,8 @@ static void app_render_single_placeholder(PixelTermApp *app, const gchar *filepa
     ui_begin_sync_update();
     printf("\033[H\033[0m");
 
-    const char *title = "Image View";
-    gint title_len = (gint)strlen(title);
-    gint title_pad = (app->term_width > title_len) ? (app->term_width - title_len) / 2 : 0;
-    printf("\033[1;1H\033[2K");
-    for (gint i = 0; i < title_pad; i++) putchar(' ');
-    printf("%s", title);
-
-    printf("\033[2;1H\033[2K");
+    ui_render_centered_row(1, app->term_width, "Image View", NULL);
+    ui_render_centered_row(2, app->term_width, "", NULL);
 
     gint current = app_get_current_index(app) + 1;
     gint total = app_get_total_images(app);
@@ -65,11 +59,7 @@ static void app_render_single_placeholder(PixelTermApp *app, const gchar *filepa
     if (total < 1) total = 1;
     char idx_text[32];
     g_snprintf(idx_text, sizeof(idx_text), "%d/%d", current, total);
-    gint idx_len = (gint)strlen(idx_text);
-    gint idx_pad = (app->term_width > idx_len) ? (app->term_width - idx_len) / 2 : 0;
-    printf("\033[3;1H\033[2K");
-    for (gint i = 0; i < idx_pad; i++) putchar(' ');
-    printf("%s", idx_text);
+    ui_render_centered_row(3, app->term_width, idx_text, NULL);
 
     gchar *basename = g_path_get_basename(filepath);
     gchar *safe_basename = sanitize_for_terminal(basename);
@@ -78,13 +68,8 @@ static void app_render_single_placeholder(PixelTermApp *app, const gchar *filepa
         max_width = app->term_width;
     }
     gchar *display_name = truncate_utf8_middle_keep_suffix(safe_basename, max_width);
-    gint filename_len = utf8_display_width(display_name);
-    gint filename_start_col = (app->term_width - filename_len) / 2;
-    if (filename_start_col < 0) filename_start_col = 0;
     gint filename_row = (app->term_height >= 3) ? (app->term_height - 2) : 1;
-    printf("\033[%d;1H\033[2K", filename_row);
-    for (gint i = 0; i < filename_start_col; i++) putchar(' ');
-    printf("\033[34m%s\033[0m", display_name);
+    ui_render_centered_row(filename_row, app->term_width, display_name, "\033[34m");
     g_free(display_name);
     g_free(safe_basename);
     g_free(basename);
@@ -378,7 +363,7 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
     }
 
     // Title + index area (single image view)
-    gint image_area_top_row = 4; // Keep layout stable even in Zen (UI hidden)
+    gint image_area_top_row = ui_single_view_content_top_row(app); // Keep layout stable even in Zen (UI hidden)
     gint image_render_top_row = image_area_top_row;
     if (is_video && target_height > 0 && image_area_height > target_height) {
         gint vpad = (image_area_height - target_height) / 2;
@@ -421,27 +406,16 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
     }
     if (!app->ui_text_hidden && app->term_height > 0) {
         const char *title = is_video ? "Video View" : "Image View";
-        gint title_len = strlen(title);
-        gint title_pad = (app->term_width > title_len) ? (app->term_width - title_len) / 2 : 0;
-        printf("\033[1;1H\033[2K");
-        for (gint i = 0; i < title_pad; i++) putchar(' ');
-        printf("%s", title);
+        ui_render_centered_row(1, app->term_width, title, NULL);
+        ui_render_centered_row(2, app->term_width, "", NULL);
 
-        // Row 2: spacer
-        printf("\033[2;1H\033[2K");
-
-        // Row 3: Index indicator centered (numbers only)
         gint current = app_get_current_index(app) + 1;
         gint total = app_get_total_images(app);
         if (current < 1) current = 1;
         if (total < 1) total = 1;
         char idx_text[32];
         g_snprintf(idx_text, sizeof(idx_text), "%d/%d", current, total);
-        gint idx_len = (gint)strlen(idx_text);
-        gint idx_pad = (app->term_width > idx_len) ? (app->term_width - idx_len) / 2 : 0;
-        printf("\033[3;1H\033[2K");
-        for (gint i = 0; i < idx_pad; i++) putchar(' ');
-        printf("%s", idx_text);
+        ui_render_centered_row(3, app->term_width, idx_text, NULL);
     }
 
     if (is_video) {

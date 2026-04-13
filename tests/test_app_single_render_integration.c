@@ -216,6 +216,33 @@ static void test_single_view_render_preserves_info_visibility(void) {
     destroy_render_test_app(&app);
 }
 
+static void test_single_view_visible_shell_preserves_current_layout_contract(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 2;
+    app.ui_text_hidden = FALSE;
+
+    gchar *output = capture_render_output(render_current_image_capture, &app);
+
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[1;1H\033[2K"));
+    g_assert_nonnull(g_strstr_len(output, -1, "Image View"));
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[3;1H\033[2K"));
+    g_assert_nonnull(g_strstr_len(output, -1, "3/3"));
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[38;1H\033[2K"));
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[34mstill.png\033[0m"));
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[40;1H\033[2K"));
+    g_assert_nonnull(g_strstr_len(output, -1, "Enter"));
+    g_assert_nonnull(g_strstr_len(output, -1, "Preview"));
+
+    g_free(output);
+    destroy_render_test_app(&app);
+}
+
 static void test_info_overlay_renders_even_when_ui_text_is_hidden(void) {
     PixelTermApp app = {0};
     if (!init_render_test_app(&app)) {
@@ -318,6 +345,8 @@ void register_app_single_render_integration_tests(void) {
                     test_file_size_display_clamps_missing_values);
     g_test_add_func("/app_single_render/single_view/switches_media_players",
                     test_single_view_render_switches_media_players);
+    g_test_add_func("/app_single_render/single_view/visible_shell_preserves_current_layout_contract",
+                    test_single_view_visible_shell_preserves_current_layout_contract);
     g_test_add_func("/app_single_render/info_overlay/preserves_visibility_on_redraw",
                     test_single_view_render_preserves_info_visibility);
     g_test_add_func("/app_single_render/info_overlay/renders_even_when_ui_text_is_hidden",
@@ -500,44 +529,6 @@ static void test_ui_clear_single_view_lines(const PixelTermApp *app) {
 }
 
 static void test_ui_clear_area(const PixelTermApp *app, gint top_row, gint height) {
-    (void)app;
-    (void)top_row;
-    (void)height;
-}
-
-gint ui_filename_max_width(const PixelTermApp *app) {
-    return app && app->term_width > 0 ? app->term_width : 80;
-}
-
-void ui_print_centered_help_line(gint row,
-                                 gint term_width,
-                                 const HelpSegment *segments,
-                                 gsize n) {
-    (void)row;
-    (void)term_width;
-    (void)segments;
-    (void)n;
-}
-
-void ui_begin_sync_update(void) {
-}
-
-void ui_end_sync_update(void) {
-}
-
-void ui_clear_screen_for_refresh(const PixelTermApp *app) {
-    (void)app;
-}
-
-void ui_clear_kitty_images(const PixelTermApp *app) {
-    (void)app;
-}
-
-void ui_clear_single_view_lines(const PixelTermApp *app) {
-    (void)app;
-}
-
-void ui_clear_area(const PixelTermApp *app, gint top_row, gint height) {
     (void)app;
     (void)top_row;
     (void)height;

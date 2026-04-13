@@ -9,6 +9,10 @@ typedef struct {
 } HelpSegment;
 
 gint ui_filename_max_width(const PixelTermApp *app);
+void ui_render_centered_row(gint row, gint term_width, const char *text, const char *style);
+gint ui_single_view_content_top_row(const PixelTermApp *app);
+gint ui_single_view_bottom_reserved_lines(const PixelTermApp *app);
+gint ui_preview_header_lines(const PixelTermApp *app);
 void ui_print_centered_help_line(gint row, gint term_width, const HelpSegment *segments, gsize n);
 void ui_begin_sync_update(void);
 void ui_end_sync_update(void);

@@ -1,5 +1,10 @@
 # Changelog
 
+- v1.7.23: Shared terminal-row helpers and layout contract tests.
+    - **UI Plumbing**: Extract shared centered-row helpers for repeated title, filename, and preview-shell text drawing while keeping the current single-view and preview-grid layout unchanged.
+    - **Layout Contracts**: Replace a few scattered row-count magic numbers with explicit single-view and preview header/footer layout helpers so future shell cleanup does not silently move the image or preview content areas.
+    - **Testing**: Link the real UI render helpers into the focused test targets and add ANSI-layout regressions for single-view, preview-grid, and shared terminal-row drawing.
+
 - v1.7.22: In-layout single-image info panel.
     - **Single Image View**: Replace the old appended file-info dump with a centered in-layout terminal panel that toggles on `i` and disappears on a second `i` press.
     - **Display Stability**: Keep the info panel available even when UI text is hidden, avoid stale graphics-protocol payloads behind the panel, and stop animated GIF refreshes from overwriting the overlay while it is open.
