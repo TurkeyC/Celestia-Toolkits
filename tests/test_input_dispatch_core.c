@@ -2,6 +2,7 @@
 
 #include "app.h"
 #include "input_dispatch_core.h"
+#include "input_dispatch_test_support.h"
 
 typedef struct {
     gint *order;
@@ -29,6 +30,13 @@ static gboolean ordered_idle_source(gpointer user_data) {
     marker->order[*(marker->index)] = marker->value;
     *(marker->index) += 1;
     return G_SOURCE_REMOVE;
+}
+
+static InputEvent make_key_event(KeyCode key_code) {
+    InputEvent event = {0};
+    event.type = INPUT_KEY_PRESS;
+    event.key_code = key_code;
+    return event;
 }
 
 static void test_process_animations_only_runs_one_iteration_per_call(void) {
@@ -90,6 +98,53 @@ static void test_process_animations_defers_when_higher_priority_sources_are_pend
     drain_default_main_context();
 }
 
+static void test_info_key_opens_info_overlay_in_single_mode(void) {
+    PixelTermApp app = {0};
+    InputHandler input_handler = {0};
+    InputEvent event = make_key_event((KeyCode)'i');
+
+    app.mode = APP_MODE_SINGLE;
+    app.total_images = 1;
+
+    input_dispatch_test_reset_stubs();
+    input_dispatch_core_handle_event(&app, &input_handler, &event);
+
+    g_assert_true(app.info_visible);
+    g_assert_cmpint(g_input_dispatch_stub_state.display_image_info_calls, ==, 1);
+}
+
+static void test_info_key_hides_info_overlay_on_second_press(void) {
+    PixelTermApp app = {0};
+    InputHandler input_handler = {0};
+    InputEvent event = make_key_event((KeyCode)'i');
+
+    app.mode = APP_MODE_SINGLE;
+    app.total_images = 1;
+    app.info_visible = TRUE;
+
+    input_dispatch_test_reset_stubs();
+    input_dispatch_core_handle_event(&app, &input_handler, &event);
+
+    g_assert_false(app.info_visible);
+    g_assert_cmpint(g_input_dispatch_stub_state.display_image_info_calls, ==, 0);
+}
+
+static void test_info_key_opens_info_overlay_when_ui_text_hidden(void) {
+    PixelTermApp app = {0};
+    InputHandler input_handler = {0};
+    InputEvent event = make_key_event((KeyCode)'i');
+
+    app.mode = APP_MODE_SINGLE;
+    app.total_images = 1;
+    app.ui_text_hidden = TRUE;
+
+    input_dispatch_test_reset_stubs();
+    input_dispatch_core_handle_event(&app, &input_handler, &event);
+
+    g_assert_true(app.info_visible);
+    g_assert_cmpint(g_input_dispatch_stub_state.display_image_info_calls, ==, 1);
+}
+
 void register_input_dispatch_core_tests(void) {
     g_test_add_func("/input_dispatch_core/process_animations/only_runs_one_iteration_per_call",
                     test_process_animations_only_runs_one_iteration_per_call);
@@ -97,4 +152,10 @@ void register_input_dispatch_core_tests(void) {
                     test_process_animations_skips_when_nothing_is_playing);
     g_test_add_func("/input_dispatch_core/process_animations/defers_when_higher_priority_sources_are_pending",
                     test_process_animations_defers_when_higher_priority_sources_are_pending);
+    g_test_add_func("/input_dispatch_core/info_key/opens_info_overlay_in_single_mode",
+                    test_info_key_opens_info_overlay_in_single_mode);
+    g_test_add_func("/input_dispatch_core/info_key/hides_info_overlay_on_second_press",
+                    test_info_key_hides_info_overlay_on_second_press);
+    g_test_add_func("/input_dispatch_core/info_key/opens_info_overlay_when_ui_text_hidden",
+                    test_info_key_opens_info_overlay_when_ui_text_hidden);
 }

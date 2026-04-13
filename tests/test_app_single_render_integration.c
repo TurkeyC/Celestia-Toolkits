@@ -1,5 +1,8 @@
 #include <glib.h>
+#include <glib/gstdio.h>
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "app.h"
 #include "app_single_render_test_internal.h"
@@ -13,9 +16,47 @@ typedef struct {
     gint video_load_calls;
     gint video_play_calls;
     gint renderer_render_file_calls;
+    gboolean last_force_text;
+    gboolean last_force_kitty;
+    gboolean last_force_iterm2;
+    gboolean last_force_sixel;
 } AppSingleRenderStubState;
 
 static AppSingleRenderStubState g_app_single_render_stub_state;
+
+typedef void (*RenderCaptureFunc)(gpointer user_data);
+
+static gchar *capture_render_output(RenderCaptureFunc render_func, gpointer user_data) {
+    gchar *template = g_strdup_printf("%s/pixelterm-single-render-XXXXXX", g_get_tmp_dir());
+    int fd = g_mkstemp(template);
+    g_assert_cmpint(fd, >=, 0);
+
+    int saved_stdout = dup(STDOUT_FILENO);
+    g_assert_cmpint(saved_stdout, >=, 0);
+
+    fflush(stdout);
+    g_assert_cmpint(dup2(fd, STDOUT_FILENO), >=, 0);
+    close(fd);
+
+    render_func(user_data);
+
+    fflush(stdout);
+    g_assert_cmpint(dup2(saved_stdout, STDOUT_FILENO), >=, 0);
+    close(saved_stdout);
+
+    gchar *output = NULL;
+    GError *error = NULL;
+    g_assert_true(g_file_get_contents(template, &output, NULL, &error));
+    g_assert_no_error(error);
+    g_remove(template);
+    g_free(template);
+    return output;
+}
+
+static void render_current_image_capture(gpointer user_data) {
+    PixelTermApp *app = (PixelTermApp *)user_data;
+    g_assert_cmpint(app_render_current_image(app), ==, ERROR_NONE);
+}
 
 static MediaKind test_media_classify(const char *path);
 static void test_get_terminal_cell_geometry(gint *cell_width, gint *cell_height);
@@ -80,6 +121,10 @@ static void destroy_render_test_app(PixelTermApp *app) {
     if (app->video_player) {
         video_player_destroy(app->video_player);
         app->video_player = NULL;
+    }
+    if (app->preloader) {
+        preloader_destroy(app->preloader);
+        app->preloader = NULL;
     }
 }
 
@@ -154,11 +199,135 @@ static void test_single_view_render_switches_media_players(void) {
     destroy_render_test_app(&app);
 }
 
+static void test_single_view_render_preserves_info_visibility(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 2;
+    app.info_visible = TRUE;
+
+    g_assert_cmpint(app_render_current_image(&app), ==, ERROR_NONE);
+    g_assert_true(app.info_visible);
+
+    destroy_render_test_app(&app);
+}
+
+static void test_info_overlay_renders_even_when_ui_text_is_hidden(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 2;
+    app.info_visible = TRUE;
+    app.force_kitty = TRUE;
+
+    gchar *output = capture_render_output(render_current_image_capture, &app);
+    g_assert_nonnull(g_strstr_len(output, -1, "File Info"));
+    g_free(output);
+
+    destroy_render_test_app(&app);
+}
+
+static void test_info_overlay_forces_text_rendering_over_graphics_modes(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 2;
+    app.info_visible = TRUE;
+    app.force_kitty = TRUE;
+
+    g_assert_cmpint(app_render_current_image(&app), ==, ERROR_NONE);
+    g_assert_true(g_app_single_render_stub_state.last_force_text);
+    g_assert_false(g_app_single_render_stub_state.last_force_kitty);
+    g_assert_false(g_app_single_render_stub_state.last_force_iterm2);
+    g_assert_false(g_app_single_render_stub_state.last_force_sixel);
+
+    destroy_render_test_app(&app);
+}
+
+static void test_info_overlay_pauses_animated_gif_updates(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 1;
+    app.info_visible = TRUE;
+    app.gif_player->is_playing = TRUE;
+
+    g_assert_cmpint(app_render_current_image(&app), ==, ERROR_NONE);
+    g_assert_false(app.gif_player->is_playing);
+    g_assert_cmpint(g_app_single_render_stub_state.gif_play_calls, ==, 0);
+
+    destroy_render_test_app(&app);
+}
+
+static void test_info_overlay_bypasses_preloader_cache(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app.preloader = preloader_create();
+    g_assert_nonnull(app.preloader);
+    app.preload_enabled = TRUE;
+
+    gint target_width = 0;
+    gint target_height = 0;
+    app_get_image_target_dimensions(&app, &target_width, &target_height);
+
+    GString *cached_graphics = g_string_new("\033_Gf=100;cached\033\\");
+    preloader_cache_add(app.preloader,
+                        "still.png",
+                        cached_graphics,
+                        target_width,
+                        target_height,
+                        TRUE,
+                        target_width,
+                        target_height);
+    g_string_free(cached_graphics, TRUE);
+
+    app_single_render_reset_stubs();
+    app.current_index = 2;
+    app.info_visible = TRUE;
+    app.force_kitty = TRUE;
+
+    g_assert_cmpint(app_render_current_image(&app), ==, ERROR_NONE);
+    g_assert_cmpint(g_app_single_render_stub_state.renderer_render_file_calls, ==, 1);
+    g_assert_true(g_app_single_render_stub_state.last_force_text);
+
+    destroy_render_test_app(&app);
+}
+
 void register_app_single_render_integration_tests(void) {
     g_test_add_func("/app_single_render/file_size_display/clamps_missing_values",
                     test_file_size_display_clamps_missing_values);
     g_test_add_func("/app_single_render/single_view/switches_media_players",
                     test_single_view_render_switches_media_players);
+    g_test_add_func("/app_single_render/info_overlay/preserves_visibility_on_redraw",
+                    test_single_view_render_preserves_info_visibility);
+    g_test_add_func("/app_single_render/info_overlay/renders_even_when_ui_text_is_hidden",
+                    test_info_overlay_renders_even_when_ui_text_is_hidden);
+    g_test_add_func("/app_single_render/info_overlay/forces_text_rendering_over_graphics_modes",
+                    test_info_overlay_forces_text_rendering_over_graphics_modes);
+    g_test_add_func("/app_single_render/info_overlay/pauses_animated_gif_updates",
+                    test_info_overlay_pauses_animated_gif_updates);
+    g_test_add_func("/app_single_render/info_overlay/bypasses_preloader_cache",
+                    test_info_overlay_bypasses_preloader_cache);
 }
 
 const gchar *app_get_current_filepath(const PixelTermApp *app) {
@@ -289,6 +458,10 @@ static ErrorCode test_renderer_initialize(ImageRenderer *renderer, const Rendere
     }
 
     renderer->config = *config;
+    g_app_single_render_stub_state.last_force_text = config->force_text;
+    g_app_single_render_stub_state.last_force_kitty = config->force_kitty;
+    g_app_single_render_stub_state.last_force_iterm2 = config->force_iterm2;
+    g_app_single_render_stub_state.last_force_sixel = config->force_sixel;
     return ERROR_NONE;
 }
 

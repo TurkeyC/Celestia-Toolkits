@@ -1,5 +1,10 @@
 # Changelog
 
+- v1.7.22: In-layout single-image info panel.
+    - **Single Image View**: Replace the old appended file-info dump with a centered in-layout terminal panel that toggles on `i` and disappears on a second `i` press.
+    - **Display Stability**: Keep the info panel available even when UI text is hidden, avoid stale graphics-protocol payloads behind the panel, and stop animated GIF refreshes from overwriting the overlay while it is open.
+    - **Testing**: Add focused regressions for `i` key dispatch, redraw visibility, graphics/text fallback, preloader-cache bypass, and animated-image overlay behavior.
+
 - v1.7.21: Text block rendering modes and cleaner test runs.
     - **Text Rendering**: Add `--text-symbols auto|half|quarter` and matching config support so text-mode rendering can explicitly use half-block or quarter-block symbol sets instead of the default automatic symbol pool.
     - **Docs**: Update the English, Chinese, and Japanese README, usage, and terminal-protocol guides to document the new text-symbol modes and examples consistently.

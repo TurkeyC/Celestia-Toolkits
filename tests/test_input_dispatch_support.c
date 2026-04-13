@@ -1,5 +1,7 @@
 #include "input_dispatch_test_support.h"
 
+#include "input.h"
+
 #include <string.h>
 
 InputDispatchTestStubState g_input_dispatch_stub_state;
@@ -83,6 +85,14 @@ ErrorCode app_refresh_display(PixelTermApp *app) {
     return ERROR_NONE;
 }
 
+ErrorCode app_display_image_info(PixelTermApp *app) {
+    g_input_dispatch_stub_state.display_image_info_calls++;
+    if (app) {
+        app->info_visible = !app->info_visible;
+    }
+    return ERROR_NONE;
+}
+
 ErrorCode app_handle_mouse_click_book_preview(PixelTermApp *app,
                                               gint mouse_x,
                                               gint mouse_y,
@@ -98,6 +108,23 @@ ErrorCode app_handle_mouse_click_book_preview(PixelTermApp *app,
         *out_hit = TRUE;
     }
     g_input_dispatch_stub_state.book_preview_click_calls++;
+    return ERROR_NONE;
+}
+
+ErrorCode app_handle_mouse_click_book_toc(PixelTermApp *app,
+                                          gint mouse_x,
+                                          gint mouse_y,
+                                          gboolean *redraw_needed,
+                                          gboolean *out_hit) {
+    (void)app;
+    (void)mouse_x;
+    (void)mouse_y;
+    if (redraw_needed) {
+        *redraw_needed = FALSE;
+    }
+    if (out_hit) {
+        *out_hit = TRUE;
+    }
     return ERROR_NONE;
 }
 
@@ -245,6 +272,12 @@ ErrorCode app_render_preview_selection_change(PixelTermApp *app, gint old_index)
     return ERROR_NONE;
 }
 
+ErrorCode app_preview_page_move(PixelTermApp *app, gint direction) {
+    (void)app;
+    (void)direction;
+    return ERROR_NONE;
+}
+
 ErrorCode app_handle_mouse_file_manager(PixelTermApp *app, gint mouse_x, gint mouse_y) {
     (void)app;
     (void)mouse_x;
@@ -348,6 +381,14 @@ ErrorCode app_delete_current_image(PixelTermApp *app) {
 
 gboolean app_has_images(const PixelTermApp *app) {
     return app && app->total_images > 0;
+}
+
+void input_dispatch_handle_key_press_preview(PixelTermApp *app,
+                                             InputHandler *input_handler,
+                                             const InputEvent *event) {
+    (void)app;
+    (void)input_handler;
+    (void)event;
 }
 
 ErrorCode app_render_by_mode(PixelTermApp *app) {

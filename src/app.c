@@ -135,14 +135,10 @@ void app_get_image_target_dimensions(const PixelTermApp *app, gint *max_width, g
     }
     gint width = (app && app->term_width > 0) ? app->term_width : 80;
     gint height = (app && app->term_height > 0) ? app->term_height : 24;
-    if (app && app->info_visible) {
-        height -= 10;
-    } else {
-        // Single view reserves: title (row 1), spacer (row 2), index (row 3),
-        // filename (row -2), spacer (row -1), footer (row -0).
-        // Keep image position/size stable even when Zen hides UI text.
-        height -= 6;
-    }
+    // Single view reserves: title (row 1), spacer (row 2), index (row 3),
+    // filename (row -2), spacer (row -1), footer (row -0).
+    // Keep image position/size stable even when the info overlay is visible.
+    height -= 6;
     if (height < 1) {
         height = 1;
     }

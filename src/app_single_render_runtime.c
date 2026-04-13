@@ -10,63 +10,8 @@ ErrorCode app_display_image_info(PixelTermApp *app) {
         return ERROR_INVALID_IMAGE;
     }
 
-    if (app->info_visible) {
-        app->info_visible = FALSE;
-        return app_render_current_image(app);
-    }
-
-    app->info_visible = TRUE;
-
-    const gchar *filepath = app_get_current_filepath(app);
-    if (!filepath) {
-        return ERROR_FILE_NOT_FOUND;
-    }
-
-    gint width, height;
-    ErrorCode error = renderer_get_media_dimensions(filepath, &width, &height);
-    if (error != ERROR_NONE) {
-        return error;
-    }
-
-    gchar *basename = g_path_get_basename(filepath);
-    gchar *dirname = g_path_get_dirname(filepath);
-    gchar *safe_basename = sanitize_for_terminal(basename);
-    gchar *safe_dirname = sanitize_for_terminal(dirname);
-    gint64 file_size = get_file_size(filepath);
-    const char *ext = get_file_extension(filepath);
-
-    gdouble file_size_mb = app_single_render_file_size_mb_for_display(file_size);
-    gdouble aspect_ratio = (height > 0) ? (gdouble)width / height : 1.0;
-    gint index = app_get_current_index(app) + 1;
-    gint total = app_get_total_images(app);
-
-    printf("\n\033[G");
-
-    for (gint i = 0; i < 60; i++) printf("=");
-    printf("\n\033[G");
-    printf("\033[36m📸 Image Details\033[0m");
-    printf("\n\033[G");
-    for (gint i = 0; i < 60; i++) printf("=");
-    printf("\n\033[G");
-    printf("\033[36m📁 Filename:\033[0m %s\n\033[G", safe_basename);
-    printf("\033[36m📂 Path:\033[0m %s\n\033[G", safe_dirname);
-    printf("\033[36m📄 Index:\033[0m %d/%d\n\033[G", index, total);
-    printf("\033[36m💾 File size:\033[0m %.1f MB\n\033[G", file_size_mb);
-    printf("\033[36m📐 Dimensions:\033[0m %d x %d pixels\n\033[G", width, height);
-    printf("\033[36m🎨 Format:\033[0m %s\n\033[G", ext ? ext + 1 : "unknown");
-    printf("\033[36m🎭 Color mode:\033[0m RGB\n\033[G");
-    printf("\033[36m📏 Aspect ratio:\033[0m %.2f\n\033[G", aspect_ratio);
-    for (gint i = 0; i < 60; i++) printf("=");
-
-    printf("\033[0m");
-    fflush(stdout);
-
-    g_free(safe_basename);
-    g_free(safe_dirname);
-    g_free(basename);
-    g_free(dirname);
-
-    return ERROR_NONE;
+    app->info_visible = !app->info_visible;
+    return app_render_current_image(app);
 }
 
 ErrorCode app_refresh_display(PixelTermApp *app) {

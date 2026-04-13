@@ -107,14 +107,155 @@ static void app_render_single_placeholder(PixelTermApp *app, const gchar *filepa
     fflush(stdout);
 }
 
+static void app_render_info_overlay_border(gint row, gint start_col, gint inner_width) {
+    printf("\033[%d;%dH\033[97;48;5;236m+", row, start_col);
+    for (gint i = 0; i < inner_width; i++) {
+        putchar('-');
+    }
+    printf("+\033[0m");
+}
+
+static void app_render_info_overlay_row(gint row,
+                                        gint start_col,
+                                        gint inner_width,
+                                        const gchar *text,
+                                        gboolean centered,
+                                        const gchar *style) {
+    gint content_width = inner_width > 2 ? inner_width - 2 : inner_width;
+    gchar *display = truncate_utf8_middle_keep_suffix(text ? text : "", content_width);
+    gint text_width = utf8_display_width(display);
+    gint text_col = start_col + 2;
+    if (centered && text_width < content_width) {
+        text_col += (content_width - text_width) / 2;
+    }
+
+    printf("\033[%d;%dH\033[97;48;5;236m|%-*s|\033[0m", row, start_col, inner_width, "");
+    printf("\033[%d;%dH%s%s\033[0m", row, text_col, style, display);
+
+    g_free(display);
+}
+
+static void app_render_info_overlay(PixelTermApp *app,
+                                    const gchar *filepath,
+                                    gint image_area_top_row,
+                                    gint image_area_height) {
+    if (!app || !filepath || !app->info_visible) {
+        return;
+    }
+
+    gint available_bottom = MIN(app->term_height - 3, image_area_top_row + image_area_height - 1);
+    gint available_height = available_bottom - image_area_top_row + 1;
+    gint inner_width = app->term_width - 10;
+    if (inner_width > 74) {
+        inner_width = 74;
+    }
+    if (inner_width < 24) {
+        return;
+    }
+
+    const gint panel_height = 10;
+    if (available_height < panel_height) {
+        return;
+    }
+
+    gint panel_width = inner_width + 2;
+    gint start_col = MAX(1, ((app->term_width - panel_width) / 2) + 1);
+    gint start_row = image_area_top_row + (available_height - panel_height) / 2;
+
+    gint width = 0;
+    gint height = 0;
+    gboolean have_dimensions = renderer_get_media_dimensions(filepath, &width, &height) == ERROR_NONE;
+    gdouble aspect_ratio = (have_dimensions && height > 0) ? (gdouble)width / height : 0.0;
+
+    gchar *basename = g_path_get_basename(filepath);
+    gchar *dirname = g_path_get_dirname(filepath);
+    gchar *safe_basename = sanitize_for_terminal(basename);
+    gchar *safe_dirname = sanitize_for_terminal(dirname);
+    gint64 file_size = get_file_size(filepath);
+    const char *ext = get_file_extension(filepath);
+    gdouble file_size_mb = app_single_render_file_size_mb_for_display(file_size);
+    gint index = app_get_current_index(app) + 1;
+    gint total = app_get_total_images(app);
+
+    gchar *line_name = g_strdup_printf("Name: %s", safe_basename);
+    gchar *line_path = g_strdup_printf("Path: %s", safe_dirname);
+    gchar *line_index = g_strdup_printf("Index: %d/%d", index, total);
+    gchar *line_size = g_strdup_printf("Size: %.1f MB", file_size_mb);
+    gchar *line_dimensions = have_dimensions
+                                 ? g_strdup_printf("Dimensions: %d x %d px", width, height)
+                                 : g_strdup("Dimensions: unknown");
+    gchar *line_format = g_strdup_printf("Format: %s", ext ? ext + 1 : "unknown");
+    gchar *line_aspect = have_dimensions
+                             ? g_strdup_printf("Aspect: %.2f", aspect_ratio)
+                             : g_strdup("Aspect: unknown");
+    const gchar *lines[] = {
+        "File Info",
+        line_name,
+        line_path,
+        line_index,
+        line_size,
+        line_dimensions,
+        line_format,
+        line_aspect,
+    };
+
+    app_render_info_overlay_border(start_row, start_col, inner_width);
+    app_render_info_overlay_row(start_row + 1,
+                                start_col,
+                                inner_width,
+                                lines[0],
+                                TRUE,
+                                "\033[1;96;48;5;236m");
+    for (gsize i = 1; i < G_N_ELEMENTS(lines); i++) {
+        app_render_info_overlay_row(start_row + (gint)i + 1,
+                                    start_col,
+                                    inner_width,
+                                    lines[i],
+                                    FALSE,
+                                    "\033[97;48;5;236m");
+    }
+    app_render_info_overlay_border(start_row + panel_height - 1, start_col, inner_width);
+
+    g_free(line_aspect);
+    g_free(line_format);
+    g_free(line_dimensions);
+    g_free(line_size);
+    g_free(line_index);
+    g_free(line_path);
+    g_free(line_name);
+    g_free(safe_dirname);
+    g_free(safe_basename);
+    g_free(dirname);
+    g_free(basename);
+}
+
+static void app_apply_info_overlay_render_mode(const PixelTermApp *app,
+                                               gboolean *force_text,
+                                               gboolean *force_sixel,
+                                               gboolean *force_kitty,
+                                               gboolean *force_iterm2) {
+    if (!app || !app->info_visible) {
+        return;
+    }
+    if (force_text) {
+        *force_text = TRUE;
+    }
+    if (force_sixel) {
+        *force_sixel = FALSE;
+    }
+    if (force_kitty) {
+        *force_kitty = FALSE;
+    }
+    if (force_iterm2) {
+        *force_iterm2 = FALSE;
+    }
+}
+
 
 ErrorCode app_render_current_image(PixelTermApp *app) {
     if (!app || !app_has_images(app)) {
         return ERROR_INVALID_IMAGE;
     }
-
-    // Reset info visibility when rendering image
-    app->info_visible = FALSE;
 
     const gchar *filepath = app_get_current_filepath(app);
     if (!filepath) {
@@ -163,6 +304,9 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
         active_kind = MEDIA_KIND_VIDEO;
     } else if (is_animated_image) {
         active_kind = MEDIA_KIND_ANIMATED_IMAGE;
+    }
+    if (app->info_visible && active_kind == MEDIA_KIND_ANIMATED_IMAGE) {
+        active_kind = MEDIA_KIND_IMAGE;
     }
     app_media_stop_inactive_players(app, active_kind);
 
@@ -482,6 +626,11 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
             .color_extractor = CHAFA_COLOR_EXTRACTOR_AVERAGE,
             .optimizations = CHAFA_OPTIMIZATION_REUSE_ATTRIBUTES
         };
+        app_apply_info_overlay_render_mode(app,
+                                           &config.force_text,
+                                           &config.force_sixel,
+                                           &config.force_kitty,
+                                           &config.force_iterm2);
 
         ErrorCode error = APP_SINGLE_RENDER_CALL(renderer_initialize,
                                                  renderer_initialize,
@@ -516,7 +665,7 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
             return ERROR_INVALID_IMAGE;
         }
     } else {
-        if (app->preloader && app->preload_enabled) {
+        if (app->preloader && app->preload_enabled && !app->info_visible) {
             rendered = preloader_get_cached_image(app->preloader, filepath, target_width, target_height);
         }
 
@@ -547,6 +696,11 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
                 .color_extractor = CHAFA_COLOR_EXTRACTOR_AVERAGE,
                 .optimizations = CHAFA_OPTIMIZATION_REUSE_ATTRIBUTES
             };
+            app_apply_info_overlay_render_mode(app,
+                                               &config.force_text,
+                                               &config.force_sixel,
+                                               &config.force_kitty,
+                                               &config.force_iterm2);
 
             ErrorCode error = APP_SINGLE_RENDER_CALL(renderer_initialize,
                                                      renderer_initialize,
@@ -577,7 +731,7 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
                                    &image_height);
 
             // Add to cache if preloader is available
-            if (app->preloader && app->preload_enabled) {
+            if (app->preloader && app->preload_enabled && !app->info_visible) {
                 preloader_cache_add(app->preloader,
                                     filepath,
                                     rendered,
@@ -659,6 +813,8 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
     }
     g_free(pad_buffer);
 
+    app_render_info_overlay(app, filepath, image_area_top_row, target_height);
+
     // Calculate filename position relative to image center
     if (filepath && !app->ui_text_hidden) {
         gchar *basename = g_path_get_basename(filepath);
@@ -708,7 +864,7 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
     }
 
     // If it's an animated image and player is available, start playing if animated
-    if (gif_is_animated && app->gif_player) {
+    if (gif_is_animated && app->gif_player && !app->info_visible) {
         // For first render, just show the first frame, then start animation
         APP_SINGLE_RENDER_CALL(gif_player_play, gif_player_play, app->gif_player);
         // Indicate that we are currently displaying an animated GIF

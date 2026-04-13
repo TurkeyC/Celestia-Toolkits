@@ -225,9 +225,6 @@ static gboolean handle_key_press_common(PixelTermApp *app,
                 return TRUE;
             }
             if (!app_is_preview_mode(app)) {
-                if (app->ui_text_hidden) {
-                    return TRUE;
-                }
                 if (app->info_visible) {
                     app->info_visible = FALSE;
                     app_render_current_image(app);
