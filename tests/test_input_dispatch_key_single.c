@@ -1,4 +1,5 @@
 #include <glib.h>
+#include <glib/gstdio.h>
 
 #include <unistd.h>
 
@@ -22,6 +23,35 @@ static InputEvent make_key_event(KeyCode key_code) {
     event.type = INPUT_KEY_PRESS;
     event.key_code = key_code;
     return event;
+}
+
+typedef void (*StdoutCaptureFunc)(gpointer user_data);
+
+static gchar *capture_output(StdoutCaptureFunc func, gpointer user_data) {
+    gchar *template = g_strdup_printf("%s/pixelterm-input-dispatch-XXXXXX", g_get_tmp_dir());
+    int fd = g_mkstemp(template);
+    g_assert_cmpint(fd, >=, 0);
+
+    int saved_stdout = dup(STDOUT_FILENO);
+    g_assert_cmpint(saved_stdout, >=, 0);
+
+    fflush(stdout);
+    g_assert_cmpint(dup2(fd, STDOUT_FILENO), >=, 0);
+    close(fd);
+
+    func(user_data);
+
+    fflush(stdout);
+    g_assert_cmpint(dup2(saved_stdout, STDOUT_FILENO), >=, 0);
+    close(saved_stdout);
+
+    gchar *output = NULL;
+    GError *error = NULL;
+    g_assert_true(g_file_get_contents(template, &output, NULL, &error));
+    g_assert_no_error(error);
+    g_remove(template);
+    g_free(template);
+    return output;
 }
 
 typedef struct {
@@ -258,6 +288,44 @@ static void test_navigation_failure_does_not_refresh_or_advance_queue(void) {
     input_dispatch_key_single_set_video_seek_for_test(NULL);
 }
 
+typedef struct {
+    PixelTermApp *app;
+} ToggleVideoFpsCall;
+
+static void toggle_video_fps_capture(gpointer user_data) {
+    ToggleVideoFpsCall *call = (ToggleVideoFpsCall *)user_data;
+    g_assert_nonnull(call);
+    input_dispatch_key_modes_toggle_video_fps(call->app);
+}
+
+static void test_video_fps_second_toggle_restores_stats_row(void) {
+    VideoPlayer player = {0};
+    PixelTermApp app = make_single_app(&player);
+    ToggleVideoFpsCall call = {.app = &app};
+
+    app.term_height = 24;
+    app.show_fps = TRUE;
+    app.ui_text_hidden = FALSE;
+    player.show_stats = TRUE;
+    player.last_frame_top_row = 3;
+    player.last_frame_height = 1;
+    player.last_frame_lines = g_ptr_array_new_with_free_func(g_free);
+    g_ptr_array_add(player.last_frame_lines, g_strdup("restored video row"));
+
+    input_dispatch_test_reset_stubs();
+    g_input_dispatch_stub_state.current_is_video = TRUE;
+
+    gchar *output = capture_output(toggle_video_fps_capture, &call);
+
+    g_assert_false(app.show_fps);
+    g_assert_false(player.show_stats);
+    g_assert_nonnull(g_strstr_len(output, -1, "\033[3;1H\033[2K"));
+    g_assert_null(g_strstr_len(output, -1, "\033[4;1H\033[2K"));
+
+    g_free(output);
+    g_ptr_array_free(player.last_frame_lines, TRUE);
+}
+
 void register_input_dispatch_key_single_tests(void) {
     g_test_add_func("/input_dispatch_key_single/navigation/left_matches_h",
                     test_left_matches_h_navigation);
@@ -273,6 +341,8 @@ void register_input_dispatch_key_single_tests(void) {
                     test_video_seek_failure_preserves_queued_repeats_for_retry);
     g_test_add_func("/input_dispatch_key_single/video/up_and_down_keep_media_switching",
                     test_video_up_and_down_keep_media_switching);
+    g_test_add_func("/input_dispatch_key_single/video/fps_second_toggle_restores_stats_row",
+                    test_video_fps_second_toggle_restores_stats_row);
     g_test_add_func("/input_dispatch_key_single/navigation/failure_does_not_refresh_or_advance_queue",
                     test_navigation_failure_does_not_refresh_or_advance_queue);
 }

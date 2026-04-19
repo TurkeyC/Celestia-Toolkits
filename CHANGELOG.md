@@ -1,5 +1,10 @@
 # Changelog
 
+- v1.7.24: Video stats toggle row restoration fix.
+    - **Video Overlay**: Fix the `f` toggle in single-video view so hiding the refresh-rate overlay actually clears the on-screen stats row instead of leaving stale FPS text behind.
+    - **Display Consistency**: Use a shared stats-row constant for both video drawing and overlay teardown, so future layout adjustments cannot desynchronize where stats are rendered versus cleared.
+    - **Testing**: Add a focused regression covering repeated `f` toggles during video playback to ensure the stats row is restored correctly after the overlay is turned off.
+
 - v1.7.23: Shared terminal-row helpers and layout contract tests.
     - **UI Plumbing**: Extract shared centered-row helpers for repeated title, filename, and preview-shell text drawing while keeping the current single-view and preview-grid layout unchanged.
     - **Layout Contracts**: Replace a few scattered row-count magic numbers with explicit single-view and preview header/footer layout helpers so future shell cleanup does not silently move the image or preview content areas.

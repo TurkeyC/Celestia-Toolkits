@@ -121,7 +121,7 @@ void input_dispatch_key_modes_toggle_video_fps(PixelTermApp *app) {
     app->show_fps = !app->show_fps;
     app->video_player->show_stats = app->show_fps && !app->ui_text_hidden;
     if (!app->show_fps && !app->ui_text_hidden) {
-        gint stats_row = 4;
+        gint stats_row = VIDEO_PLAYER_STATS_ROW;
         if (stats_row >= 1 && stats_row <= app->term_height) {
             gboolean restored_line = FALSE;
             VideoPlayer *player = app->video_player;

@@ -28,6 +28,8 @@ typedef struct {
     guint generation;
 } RenderedFrame;
 
+#define VIDEO_PLAYER_STATS_ROW 3
+
 // Video playback structure
 typedef struct {
     gboolean is_playing;
