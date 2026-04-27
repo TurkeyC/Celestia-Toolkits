@@ -413,6 +413,48 @@ static void test_info_overlay_pauses_video_and_renders_panel(void) {
     destroy_render_test_app(&app);
 }
 
+static void test_info_overlay_does_not_render_when_terminal_too_short(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 2;
+    app.info_visible = TRUE;
+    app.term_width = 80;
+    app.term_height = 9;
+
+    gchar *output = capture_render_output(render_current_image_capture, &app);
+
+    g_assert_null(g_strstr_len(output, -1, "File Info"));
+
+    g_free(output);
+    destroy_render_test_app(&app);
+}
+
+static void test_info_overlay_uses_full_terminal_height_for_fit(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 2;
+    app.info_visible = TRUE;
+    app.term_width = 80;
+    app.term_height = 12;
+
+    gchar *output = capture_render_output(render_current_image_capture, &app);
+
+    g_assert_nonnull(g_strstr_len(output, -1, "File Info"));
+
+    g_free(output);
+    destroy_render_test_app(&app);
+}
+
 static void test_info_overlay_pauses_animated_gif_updates(void) {
     PixelTermApp app = {0};
     if (!init_render_test_app(&app)) {
@@ -495,6 +537,10 @@ void register_app_single_render_integration_tests(void) {
                     test_help_overlay_pauses_video_and_skips_playback);
     g_test_add_func("/app_single_render/info_overlay/pauses_video_and_renders_panel",
                     test_info_overlay_pauses_video_and_renders_panel);
+    g_test_add_func("/app_single_render/info_overlay/does_not_render_when_terminal_too_short",
+                    test_info_overlay_does_not_render_when_terminal_too_short);
+    g_test_add_func("/app_single_render/info_overlay/uses_full_terminal_height_for_fit",
+                    test_info_overlay_uses_full_terminal_height_for_fit);
     g_test_add_func("/app_single_render/info_overlay/pauses_animated_gif_updates",
                     test_info_overlay_pauses_animated_gif_updates);
     g_test_add_func("/app_single_render/info_overlay/bypasses_preloader_cache",

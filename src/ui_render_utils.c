@@ -211,9 +211,17 @@ static void ui_panel_pair_row(gint row,
                               gint inner_width,
                               gint left_width,
                               const UIPanelRow *panel_row) {
-    gint right_width = inner_width - left_width - 7;
-    if (right_width < 8) {
-        right_width = 8;
+    gint max_left_width = inner_width - 6;
+    if (max_left_width < 1) {
+        max_left_width = 1;
+    }
+    if (left_width > max_left_width) {
+        left_width = max_left_width;
+    }
+
+    gint right_width = inner_width - left_width - 4;
+    if (right_width < 1) {
+        right_width = 1;
     }
     gchar *left = truncate_utf8_for_display(panel_row && panel_row->left ? panel_row->left : "", left_width);
     gchar *right = truncate_utf8_middle_keep_suffix(panel_row && panel_row->right ? panel_row->right : "", right_width);
@@ -229,9 +237,13 @@ void ui_render_panel(gint term_width, gint term_height, const UIPanel *panel) {
         return;
     }
 
+    const char *title = panel->title ? panel->title : "";
+    gsize line_count = panel->lines ? panel->line_count : 0;
+    gsize row_count = panel->rows ? panel->row_count : 0;
+
     gint left_width = 0;
     gint right_width = 0;
-    for (gsize i = 0; i < panel->row_count; i++) {
+    for (gsize i = 0; i < row_count; i++) {
         left_width = MAX(left_width, utf8_display_width(panel->rows[i].left));
         right_width = MAX(right_width, utf8_display_width(panel->rows[i].right));
     }
@@ -239,11 +251,11 @@ void ui_render_panel(gint term_width, gint term_height, const UIPanel *panel) {
         left_width = 18;
     }
 
-    gint content_width = utf8_display_width(panel->title);
-    for (gsize i = 0; i < panel->line_count; i++) {
+    gint content_width = utf8_display_width(title);
+    for (gsize i = 0; i < line_count; i++) {
         content_width = MAX(content_width, utf8_display_width(panel->lines[i]));
     }
-    if (panel->row_count > 0) {
+    if (row_count > 0) {
         content_width = MAX(content_width, left_width + right_width + 7);
     }
 
@@ -257,8 +269,8 @@ void ui_render_panel(gint term_width, gint term_height, const UIPanel *panel) {
     inner_width = MIN(inner_width, term_width - 4);
     inner_width = MAX(inner_width, 4);
 
-    gint panel_height = 3 + (gint)panel->line_count + (gint)panel->row_count;
-    if (panel->line_count > 0 && panel->row_count > 0) {
+    gint panel_height = 3 + (gint)line_count + (gint)row_count;
+    if (line_count > 0 && row_count > 0) {
         panel_height++;
     }
     panel_height = MIN(panel_height, term_height);
@@ -268,17 +280,17 @@ void ui_render_panel(gint term_width, gint term_height, const UIPanel *panel) {
     gint start_row = MAX(1, ((term_height - panel_height) / 2) + 1);
 
     ui_panel_border(start_row, start_col, inner_width);
-    ui_panel_text_row(start_row + 1, start_col, inner_width, panel->title, TRUE, "\033[1;96;48;5;236m");
+    ui_panel_text_row(start_row + 1, start_col, inner_width, title, TRUE, "\033[1;96;48;5;236m");
 
     gint row = start_row + 2;
-    for (gsize i = 0; i < panel->line_count && row < start_row + panel_height - 1; i++, row++) {
+    for (gsize i = 0; i < line_count && row < start_row + panel_height - 1; i++, row++) {
         ui_panel_text_row(row, start_col, inner_width, panel->lines[i], FALSE, "\033[97;48;5;236m");
     }
-    if (panel->line_count > 0 && panel->row_count > 0 && row < start_row + panel_height - 1) {
+    if (line_count > 0 && row_count > 0 && row < start_row + panel_height - 1) {
         ui_panel_blank_row(row, start_col, inner_width);
         row++;
     }
-    for (gsize i = 0; i < panel->row_count && row < start_row + panel_height - 1; i++, row++) {
+    for (gsize i = 0; i < row_count && row < start_row + panel_height - 1; i++, row++) {
         ui_panel_pair_row(row, start_col, inner_width, left_width, &panel->rows[i]);
     }
     ui_panel_border(start_row + panel_height - 1, start_col, inner_width);

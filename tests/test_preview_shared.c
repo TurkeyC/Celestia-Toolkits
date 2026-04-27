@@ -102,6 +102,18 @@ static void draw_panel_capture(gpointer user_data) {
     ui_render_panel(args->term_width, args->term_height, &args->panel);
 }
 
+static void draw_null_panel_rows_capture(gpointer user_data) {
+    (void)user_data;
+    UIPanel panel = {
+        .title = "Safe Panel",
+        .line_count = 1,
+        .row_count = 1,
+        .min_inner_width = 24,
+        .max_inner_width = 46
+    };
+    ui_render_panel(50, 10, &panel);
+}
+
 static gchar *capture_draw_output(gint content_x,
                                   gint content_y,
                                   gint content_width,
@@ -332,6 +344,39 @@ static void test_ui_render_panel_draws_title_rows_and_truncates_columns(void) {
     g_free(output);
 }
 
+static void test_ui_render_panel_keeps_pair_rows_inside_narrow_panel(void) {
+    const UIPanelRow rows[] = {
+        {"LongShortcutName", "LongAction"}
+    };
+    UIPanelCaptureArgs args = {
+        .term_width = 32,
+        .term_height = 8,
+        .panel = {
+            .title = "Help",
+            .rows = rows,
+            .row_count = G_N_ELEMENTS(rows),
+            .min_inner_width = 28,
+            .max_inner_width = 68
+        }
+    };
+
+    gchar *output = capture_panel_output(&args);
+
+    g_assert_null(g_strstr_len(output, -1, "\033[4;34H"));
+    g_assert_null(g_strstr_len(output, -1, "\033[4;35H"));
+    g_assert_null(g_strstr_len(output, -1, "\033[4;36H"));
+
+    g_free(output);
+}
+
+static void test_ui_render_panel_tolerates_null_line_and_row_arrays(void) {
+    gchar *output = capture_output(draw_null_panel_rows_capture, NULL);
+
+    g_assert_nonnull(g_strstr_len(output, -1, "Safe Panel"));
+
+    g_free(output);
+}
+
 void register_preview_shared_tests(void) {
     g_test_add_func("/preview_shared/draw_rendered_lines/centers_both_axes",
                     test_draw_rendered_lines_centers_both_axes);
@@ -353,6 +398,10 @@ void register_preview_shared_tests(void) {
                     test_ui_preview_header_lines_follow_visibility);
     g_test_add_func("/preview_shared/ui_render/panel_draws_title_rows_and_truncates_columns",
                     test_ui_render_panel_draws_title_rows_and_truncates_columns);
+    g_test_add_func("/preview_shared/ui_render/panel_keeps_pair_rows_inside_narrow_panel",
+                    test_ui_render_panel_keeps_pair_rows_inside_narrow_panel);
+    g_test_add_func("/preview_shared/ui_render/panel_tolerates_null_line_and_row_arrays",
+                    test_ui_render_panel_tolerates_null_line_and_row_arrays);
     g_test_add_func("/preview_shared/grid_renderer/forces_text_when_help_overlay_visible",
                     test_grid_renderer_forces_text_when_help_overlay_visible);
 }

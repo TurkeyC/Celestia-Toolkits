@@ -104,15 +104,10 @@ static void app_render_info_overlay(PixelTermApp *app,
     if (!app || !filepath || !app->info_visible) {
         return;
     }
+    (void)image_area_top_row;
+    (void)image_area_height;
 
-    gint available_bottom = MIN(app->term_height - 3, image_area_top_row + image_area_height - 1);
-    gint available_height = available_bottom - image_area_top_row + 1;
-    if (app->term_width < 28) {
-        return;
-    }
-
-    const gint panel_height = 9;
-    if (available_height < panel_height) {
+    if (app->term_width < 28 || app->term_height < 10) {
         return;
     }
 
