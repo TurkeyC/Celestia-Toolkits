@@ -221,7 +221,7 @@ static gboolean handle_key_press_common(PixelTermApp *app,
             app_render_by_mode(app);
             return TRUE;
         case (KeyCode)'i':
-            if (input_dispatch_current_is_video(app) || app_is_book_mode(app) || app_is_book_preview_mode(app)) {
+            if (app_is_book_mode(app) || app_is_book_preview_mode(app)) {
                 return TRUE;
             }
             if (!app_is_preview_mode(app)) {

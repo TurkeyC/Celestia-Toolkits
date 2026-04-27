@@ -1,5 +1,12 @@
 # Changelog
 
+- v1.7.26: Overlay panel stability and video help/info fixes.
+    - **Overlay Panels**: Route single-image help and info panels through the shared centered panel renderer so overlay layout, truncation, and borders stay consistent.
+    - **Resize Stability**: Make terminal resize repainting wait for dimensions to settle, clear stale graphics placements, and avoid partial clears while overlays are visible so image, GIF, and panel layers no longer smear together.
+    - **Video Overlays**: Keep `?` help and `i` file info visible in video view by pausing playback and skipping frame scheduling while overlays are open.
+    - **Protocol Recovery**: Clear hidden help state when the terminal is too small to draw the panel, allowing image rendering to return to the active graphics protocol instead of staying in text mode.
+    - **Testing**: Add regressions for shared panel rendering, resize overlay clears, video help/info overlays, video `i` dispatch, and image navigation clearing overlay state.
+
 - v1.7.25: Help overlay and file-manager navigation polish.
     - **Help Overlay**: Keep `?` help visible above image and preview-grid content by clearing graphics-protocol placements, forcing text rendering while help is open, and bypassing preloaded graphics thumbnails that could cover the panel.
     - **File Manager Controls**: Make English letters consistently jump to matching entries by first letter, while keeping arrow keys as the primary visible navigation controls.

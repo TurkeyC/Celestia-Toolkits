@@ -20,6 +20,8 @@ typedef struct {
     gboolean last_force_kitty;
     gboolean last_force_iterm2;
     gboolean last_force_sixel;
+    gint clear_screen_calls;
+    gint clear_area_calls;
 } AppSingleRenderStubState;
 
 static AppSingleRenderStubState g_app_single_render_stub_state;
@@ -304,6 +306,113 @@ static void test_help_overlay_forces_text_rendering_over_graphics_modes(void) {
     destroy_render_test_app(&app);
 }
 
+static void test_help_overlay_rerenders_during_single_view_redraw(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 2;
+    app.help_visible = TRUE;
+
+    gchar *output = capture_render_output(render_current_image_capture, &app);
+
+    g_assert_nonnull(g_strstr_len(output, -1, "Image View Help"));
+    g_assert_true(app.help_visible);
+
+    g_free(output);
+    destroy_render_test_app(&app);
+}
+
+static void test_help_overlay_clears_when_terminal_too_small_to_render(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 2;
+    app.help_visible = TRUE;
+    app.force_kitty = TRUE;
+    app.term_width = 20;
+    app.term_height = 6;
+
+    g_assert_cmpint(app_render_current_image(&app), ==, ERROR_NONE);
+    g_assert_false(app.help_visible);
+    g_assert_false(g_app_single_render_stub_state.last_force_text);
+    g_assert_true(g_app_single_render_stub_state.last_force_kitty);
+
+    destroy_render_test_app(&app);
+}
+
+static void test_help_overlay_uses_full_clear_even_when_suppressed(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 2;
+    app.help_visible = TRUE;
+    app.suppress_full_clear = TRUE;
+
+    g_assert_cmpint(app_render_current_image(&app), ==, ERROR_NONE);
+    g_assert_cmpint(g_app_single_render_stub_state.clear_screen_calls, ==, 1);
+    g_assert_cmpint(g_app_single_render_stub_state.clear_area_calls, ==, 0);
+
+    destroy_render_test_app(&app);
+}
+
+static void test_help_overlay_pauses_video_and_skips_playback(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 0;
+    app.help_visible = TRUE;
+    app.video_player->is_playing = TRUE;
+    app.video_player->has_video = TRUE;
+
+    gchar *output = capture_render_output(render_current_image_capture, &app);
+
+    g_assert_false(app.video_player->is_playing);
+    g_assert_cmpint(g_app_single_render_stub_state.video_play_calls, ==, 0);
+    g_assert_nonnull(g_strstr_len(output, -1, "Image View Help"));
+
+    g_free(output);
+    destroy_render_test_app(&app);
+}
+
+static void test_info_overlay_pauses_video_and_renders_panel(void) {
+    PixelTermApp app = {0};
+    if (!init_render_test_app(&app)) {
+        g_test_skip("media players unavailable");
+        return;
+    }
+
+    app_single_render_reset_stubs();
+    app.current_index = 0;
+    app.info_visible = TRUE;
+    app.video_player->is_playing = TRUE;
+    app.video_player->has_video = TRUE;
+
+    gchar *output = capture_render_output(render_current_image_capture, &app);
+
+    g_assert_false(app.video_player->is_playing);
+    g_assert_cmpint(g_app_single_render_stub_state.video_play_calls, ==, 0);
+    g_assert_nonnull(g_strstr_len(output, -1, "File Info"));
+
+    g_free(output);
+    destroy_render_test_app(&app);
+}
+
 static void test_info_overlay_pauses_animated_gif_updates(void) {
     PixelTermApp app = {0};
     if (!init_render_test_app(&app)) {
@@ -376,6 +485,16 @@ void register_app_single_render_integration_tests(void) {
                     test_info_overlay_forces_text_rendering_over_graphics_modes);
     g_test_add_func("/app_single_render/help_overlay/forces_text_rendering_over_graphics_modes",
                     test_help_overlay_forces_text_rendering_over_graphics_modes);
+    g_test_add_func("/app_single_render/help_overlay/rerenders_during_single_view_redraw",
+                    test_help_overlay_rerenders_during_single_view_redraw);
+    g_test_add_func("/app_single_render/help_overlay/clears_when_terminal_too_small_to_render",
+                    test_help_overlay_clears_when_terminal_too_small_to_render);
+    g_test_add_func("/app_single_render/help_overlay/uses_full_clear_even_when_suppressed",
+                    test_help_overlay_uses_full_clear_even_when_suppressed);
+    g_test_add_func("/app_single_render/help_overlay/pauses_video_and_skips_playback",
+                    test_help_overlay_pauses_video_and_skips_playback);
+    g_test_add_func("/app_single_render/info_overlay/pauses_video_and_renders_panel",
+                    test_info_overlay_pauses_video_and_renders_panel);
     g_test_add_func("/app_single_render/info_overlay/pauses_animated_gif_updates",
                     test_info_overlay_pauses_animated_gif_updates);
     g_test_add_func("/app_single_render/info_overlay/bypasses_preloader_cache",
@@ -541,6 +660,7 @@ static void test_ui_end_sync_update(void) {
 
 static void test_ui_clear_screen_for_refresh(const PixelTermApp *app) {
     (void)app;
+    g_app_single_render_stub_state.clear_screen_calls++;
 }
 
 static void test_ui_clear_kitty_images(const PixelTermApp *app) {
@@ -555,4 +675,5 @@ static void test_ui_clear_area(const PixelTermApp *app, gint top_row, gint heigh
     (void)app;
     (void)top_row;
     (void)height;
+    g_app_single_render_stub_state.clear_area_calls++;
 }

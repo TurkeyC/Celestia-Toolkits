@@ -16,6 +16,7 @@
 #include "input.h"
 #include "input_dispatch.h"
 #include "common.h"
+#include "ui_render_utils.h"
 
 // Global application instance
 static PixelTermApp *g_app = NULL;
@@ -80,6 +81,7 @@ static ErrorCode run_application(PixelTermApp *app, gboolean alt_screen_enabled)
     // Main event loop
     InputEvent event;
     static gint last_term_width = 0, last_term_height = 0;
+    gboolean resize_pending = FALSE;
     // Initialize terminal size tracking
     last_term_width = input_handler->terminal_width;
     last_term_height = input_handler->terminal_height;
@@ -95,17 +97,32 @@ static ErrorCode run_application(PixelTermApp *app, gboolean alt_screen_enabled)
         input_update_terminal_size(input_handler);
         if (last_term_width != input_handler->terminal_width || 
             last_term_height != input_handler->terminal_height) {
-            // Terminal size changed, update tracking and refresh
+            // Wait for resize events to settle before repainting heavy image frames.
             last_term_width = input_handler->terminal_width;
             last_term_height = input_handler->terminal_height;
-            get_terminal_size(&app->term_width, &app->term_height);
+            app->term_width = last_term_width;
+            app->term_height = last_term_height;
 
             input_dispatch_pause_video_for_resize(app);
+            if (app->gif_player && gif_player_is_playing(app->gif_player)) {
+                gif_player_pause(app->gif_player);
+            }
             if (app_is_preview_mode(app)) {
                 app->needs_screen_clear = TRUE;
             }
-            app_render_by_mode(app);
+            ui_clear_kitty_images(app);
+            ui_clear_screen_for_refresh(app);
+            fflush(stdout);
+            resize_pending = TRUE;
             usleep(k_resize_sleep_us);
+            continue;
+        }
+
+        if (resize_pending) {
+            resize_pending = FALSE;
+            get_terminal_size(&app->term_width, &app->term_height);
+            app->suppress_full_clear = FALSE;
+            app_render_by_mode(app);
             continue;
         }
         

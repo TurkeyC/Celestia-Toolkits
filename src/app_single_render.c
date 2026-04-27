@@ -15,6 +15,10 @@
 
 static const AppSingleRenderTestHooks *app_single_render_test_hooks = NULL;
 
+static gboolean app_help_overlay_can_render(gint term_width, gint term_height) {
+    return term_width >= 32 && term_height >= 8;
+}
+
 #define APP_SINGLE_RENDER_CALL(field, fallback, ...) \
     ((app_single_render_test_hooks && app_single_render_test_hooks->field) ? \
         app_single_render_test_hooks->field(__VA_ARGS__) : fallback(__VA_ARGS__))
@@ -263,11 +267,11 @@ static const UIPanelRow *app_help_rows_for_mode(const PixelTermApp *app, gsize *
 }
 
 void app_render_help_overlay(PixelTermApp *app) {
-    if (!app) {
+    if (!app || !app->help_visible) {
         return;
     }
-    get_terminal_size(&app->term_width, &app->term_height);
-    if (app->term_width < 32 || app->term_height < 8) {
+    if (!app_help_overlay_can_render(app->term_width, app->term_height)) {
+        app->help_visible = FALSE;
         return;
     }
 
@@ -316,6 +320,9 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
     if (!filepath) {
         return ERROR_FILE_NOT_FOUND;
     }
+    if (app->help_visible && !app_help_overlay_can_render(app->term_width, app->term_height)) {
+        app->help_visible = FALSE;
+    }
 
     // Check if it's an animated image/video file and handle animation
     MediaKind media_kind = APP_SINGLE_RENDER_CALL(media_classify, media_classify, filepath);
@@ -360,7 +367,11 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
     } else if (is_animated_image) {
         active_kind = MEDIA_KIND_ANIMATED_IMAGE;
     }
-    if ((app->info_visible || app->help_visible) && active_kind == MEDIA_KIND_ANIMATED_IMAGE) {
+    gboolean overlay_visible = app->info_visible || app->help_visible;
+    if (overlay_visible && active_kind == MEDIA_KIND_ANIMATED_IMAGE) {
+        active_kind = MEDIA_KIND_IMAGE;
+    }
+    if (overlay_visible && active_kind == MEDIA_KIND_VIDEO) {
         active_kind = MEDIA_KIND_IMAGE;
     }
     app_media_stop_inactive_players(app, active_kind);
@@ -445,7 +456,8 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
     APP_SINGLE_RENDER_CALL(ui_begin_sync_update, ui_begin_sync_update);
     APP_SINGLE_RENDER_CALL(ui_clear_kitty_images, ui_clear_kitty_images, app);
     // Clear screen and reset terminal state
-    if (app && app->suppress_full_clear) {
+    gboolean allow_partial_clear = app && app->suppress_full_clear && !app->info_visible && !app->help_visible;
+    if (allow_partial_clear) {
         app->suppress_full_clear = FALSE;
         printf("\033[H\033[0m");
         if (app->ui_text_hidden) {
@@ -453,6 +465,9 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
         }
         APP_SINGLE_RENDER_CALL(ui_clear_area, ui_clear_area, app, image_area_top_row, image_area_height);
     } else {
+        if (app) {
+            app->suppress_full_clear = FALSE;
+        }
         APP_SINGLE_RENDER_CALL(ui_clear_screen_for_refresh, ui_clear_screen_for_refresh, app);
     }
     if (app->gif_player) {
@@ -544,7 +559,10 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
             ui_print_centered_help_line(app->term_height, app->term_width, segments, G_N_ELEMENTS(segments));
         }
 
-        if (app->video_player) {
+        if (overlay_visible) {
+            app_render_info_overlay(app, filepath, image_area_top_row, target_height);
+            app_render_help_overlay(app);
+        } else if (app->video_player) {
             APP_SINGLE_RENDER_CALL(video_player_play, video_player_play, app->video_player);
             app->needs_redraw = FALSE;
         } else {
@@ -859,6 +877,7 @@ ErrorCode app_render_current_image(PixelTermApp *app) {
     g_free(pad_buffer);
 
     app_render_info_overlay(app, filepath, image_area_top_row, target_height);
+    app_render_help_overlay(app);
 
     // Calculate filename position relative to image center
     if (filepath && !app->ui_text_hidden) {

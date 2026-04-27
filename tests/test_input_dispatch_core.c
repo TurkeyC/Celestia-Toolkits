@@ -145,6 +145,22 @@ static void test_info_key_opens_info_overlay_when_ui_text_hidden(void) {
     g_assert_cmpint(g_input_dispatch_stub_state.display_image_info_calls, ==, 1);
 }
 
+static void test_info_key_opens_info_overlay_for_video(void) {
+    PixelTermApp app = {0};
+    InputHandler input_handler = {0};
+    InputEvent event = make_key_event((KeyCode)'i');
+
+    app.mode = APP_MODE_SINGLE;
+    app.total_images = 1;
+
+    input_dispatch_test_reset_stubs();
+    g_input_dispatch_stub_state.current_is_video = TRUE;
+    input_dispatch_core_handle_event(&app, &input_handler, &event);
+
+    g_assert_true(app.info_visible);
+    g_assert_cmpint(g_input_dispatch_stub_state.display_image_info_calls, ==, 1);
+}
+
 static void test_question_key_opens_help_overlay(void) {
     PixelTermApp app = {0};
     InputHandler input_handler = {0};
@@ -174,6 +190,8 @@ void register_input_dispatch_core_tests(void) {
                     test_info_key_hides_info_overlay_on_second_press);
     g_test_add_func("/input_dispatch_core/info_key/opens_info_overlay_when_ui_text_hidden",
                     test_info_key_opens_info_overlay_when_ui_text_hidden);
+    g_test_add_func("/input_dispatch_core/info_key/opens_info_overlay_for_video",
+                    test_info_key_opens_info_overlay_for_video);
     g_test_add_func("/input_dispatch_core/help_key/question_opens_help_overlay",
                     test_question_key_opens_help_overlay);
 }
