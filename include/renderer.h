@@ -194,12 +194,6 @@ ErrorCode renderer_get_media_dimensions(const char *filepath, gint *width, gint 
  */
 void renderer_get_rendered_dimensions(ImageRenderer *renderer, gint *width, gint *height);
 gboolean renderer_is_graphics_mode(const ImageRenderer *renderer);
-guint8 *renderer_color_enhance_copy_for_test(const guint8 *pixel_data,
-                                             gint width,
-                                             gint height,
-                                             gint rowstride,
-                                             gint n_channels,
-                                             ColorEnhanceMode mode);
 
 
 

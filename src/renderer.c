@@ -92,7 +92,7 @@ static gboolean renderer_should_apply_gamma(const ImageRenderer *renderer) {
 
 static guint8 *renderer_apply_gamma_copy(const guint8 *pixel_data, gint width, gint height,
                                           gint rowstride, gint n_channels, gdouble gamma) {
-    if (!pixel_data || width <= 0 || height <= 0 || rowstride <= 0) {
+    if (!pixel_data || width <= 0 || height <= 0 || rowstride <= 0 || n_channels < 3) {
         return NULL;
     }
 
@@ -142,7 +142,7 @@ static guint8 *renderer_apply_color_enhance_copy(const guint8 *pixel_data,
                                                  gint rowstride,
                                                  gint n_channels,
                                                  ColorEnhanceMode mode) {
-    if (!pixel_data || width <= 0 || height <= 0 || rowstride <= 0) {
+    if (!pixel_data || width <= 0 || height <= 0 || rowstride <= 0 || n_channels < 3) {
         return NULL;
     }
     if (mode == COLOR_ENHANCE_OFF) {

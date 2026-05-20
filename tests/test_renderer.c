@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "renderer.h"
+#include "renderer_test_internal.h"
 
 GdkPixbuf *gdk_pixbuf_new_from_stream(GInputStream *stream, GCancellable *cancellable, GError **error) {
     (void)cancellable;
@@ -358,6 +359,19 @@ static void test_renderer_color_enhance_vivid_boosts_color_separation(void) {
     g_free(adjusted);
 }
 
+static void test_renderer_color_enhance_skips_short_pixel_formats(void) {
+    const guint8 pixels[] = {120, 80};
+
+    guint8 *adjusted = renderer_color_enhance_copy_for_test(pixels,
+                                                            1,
+                                                            1,
+                                                            2,
+                                                            2,
+                                                            COLOR_ENHANCE_VIVID);
+
+    g_assert_null(adjusted);
+}
+
 void register_renderer_tests(void) {
     g_test_add_func("/renderer/cache_roundtrip", test_renderer_cache_roundtrip);
     g_test_add_func("/renderer/get_rendered_dimensions", test_renderer_get_rendered_dimensions_defaults);
@@ -378,4 +392,6 @@ void register_renderer_tests(void) {
                     test_renderer_color_enhance_off_keeps_pixels_unchanged);
     g_test_add_func("/renderer/color_enhance/vivid_boosts_color_separation",
                     test_renderer_color_enhance_vivid_boosts_color_separation);
+    g_test_add_func("/renderer/color_enhance/skips_short_pixel_formats",
+                    test_renderer_color_enhance_skips_short_pixel_formats);
 }
