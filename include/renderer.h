@@ -17,6 +17,7 @@ typedef struct {
     gboolean force_iterm2;
     TextSymbolMode text_symbol_mode;
     gdouble gamma;
+    ColorEnhanceMode color_enhance;
     
     // Advanced quality settings
     ChafaDitherMode dither_mode;

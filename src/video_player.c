@@ -1074,6 +1074,7 @@ VideoPlayer* video_player_new(gint work_factor, gboolean force_text, gboolean fo
     player->present_fps = 0.0;
     player->present_fps_valid = FALSE;
     player->show_stats = FALSE;
+    player->color_enhance = COLOR_ENHANCE_OFF;
 
     if (work_factor < 1) {
         work_factor = 1;
@@ -1095,6 +1096,7 @@ VideoPlayer* video_player_new(gint work_factor, gboolean force_text, gboolean fo
             .force_iterm2 = force_iterm2,
             .text_symbol_mode = text_symbol_mode,
             .gamma = gamma,
+            .color_enhance = COLOR_ENHANCE_OFF,
             .dither_mode = CHAFA_DITHER_MODE_NONE,
             .color_extractor = CHAFA_COLOR_EXTRACTOR_AVERAGE,
             .optimizations = CHAFA_OPTIMIZATION_REUSE_ATTRIBUTES
@@ -1276,6 +1278,7 @@ static RendererConfig video_player_render_worker_config(VideoPlayer *player) {
         .force_iterm2 = FALSE,
         .text_symbol_mode = TEXT_SYMBOL_MODE_AUTO,
         .gamma = 1.0,
+        .color_enhance = player ? player->color_enhance : COLOR_ENHANCE_OFF,
         .dither_mode = CHAFA_DITHER_MODE_NONE,
         .color_extractor = CHAFA_COLOR_EXTRACTOR_AVERAGE,
         .optimizations = CHAFA_OPTIMIZATION_REUSE_ATTRIBUTES
@@ -1289,6 +1292,10 @@ static RendererConfig video_player_render_worker_config(VideoPlayer *player) {
     config = player->renderer->config;
     g_mutex_unlock(&player->render_mutex);
     return config;
+}
+
+RendererConfig video_player_render_worker_config_for_test(VideoPlayer *player) {
+    return video_player_render_worker_config(player);
 }
 
 static void video_player_render_worker_refresh_layout(VideoPlayer *player,

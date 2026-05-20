@@ -2241,6 +2241,26 @@ static void test_seek_frame_with_test_hook_uses_registered_callback(void) {
     video_player_destroy(player);
 }
 
+static void test_render_worker_config_uses_player_color_enhance_without_renderer(void) {
+    VideoPlayer *player = video_player_new(4, TRUE, FALSE, FALSE, FALSE, TEXT_SYMBOL_MODE_AUTO, 1.0);
+    if (!player) {
+        g_test_skip("video player unavailable");
+        return;
+    }
+
+    if (player->renderer && player->owns_renderer) {
+        renderer_destroy(player->renderer);
+    }
+    player->renderer = NULL;
+    player->owns_renderer = FALSE;
+    player->color_enhance = COLOR_ENHANCE_VIVID;
+
+    RendererConfig config = video_player_render_worker_config_for_test(player);
+
+    g_assert_cmpint(config.color_enhance, ==, COLOR_ENHANCE_VIVID);
+    video_player_destroy(player);
+}
+
 void register_video_player_tests(void) {
     g_test_add_func("/video_player/reset_timing_state/clears_loop_sensitive_fields",
                     test_reset_timing_state_clears_loop_sensitive_fields);
@@ -2300,6 +2320,8 @@ void register_video_player_tests(void) {
                     test_render_layout_generation_starts_initialized);
     g_test_add_func("/video_player/render_layout_generation/increments_only_on_layout_change",
                     test_render_layout_generation_increments_only_on_layout_change);
+    g_test_add_func("/video_player/render_worker_config/uses_player_color_enhance_without_renderer",
+                    test_render_worker_config_uses_player_color_enhance_without_renderer);
     g_test_add_func("/video_player/drop_late_frame/does_not_drop_when_backlog_is_shallow",
                     test_should_not_drop_late_frame_when_backlog_is_shallow);
     g_test_add_func("/video_player/drop_late_frame/does_not_drop_when_backlog_is_medium",

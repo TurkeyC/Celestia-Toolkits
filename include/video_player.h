@@ -80,6 +80,7 @@ typedef struct {
     gdouble present_fps;
     gboolean present_fps_valid;
     gboolean show_stats;
+    ColorEnhanceMode color_enhance;
 
     // FFmpeg state
     struct AVFormatContext *format_context;
