@@ -8,11 +8,22 @@ gchar* sanitize_for_terminal(const gchar *text) {
     }
 
     gchar *safe = g_strdup(text);
-    for (gchar *p = safe; *p; ++p) {
-        unsigned char c = (unsigned char)*p;
-        if (c < 0x20 || c == 0x7f || c == '\033') {
+    for (gchar *p = safe; *p;) {
+        gunichar ch = g_utf8_get_char_validated(p, -1);
+        if (ch == (gunichar)-1 || ch == (gunichar)-2) {
             *p = '?';
+            p++;
+            continue;
         }
+
+        if ((ch < 0x20) || (ch >= 0x80 && ch <= 0x9f) || ch == 0x7f || ch == 0x1b) {
+            gint char_len = (gint)(g_utf8_next_char(p) - p);
+            memset(p, '?', (gsize)char_len);
+            p += char_len;
+            continue;
+        }
+
+        p = g_utf8_next_char(p);
     }
     return safe;
 }

@@ -7,6 +7,7 @@ DRY_RUN=0
 PRINT_ASSET_NAME=0
 PRINT_INSTALL_PATH=0
 TMP_DIR=""
+CHECKSUMS_URL="https://github.com/%s/releases/latest/download/SHA256SUMS"
 
 usage() {
   cat <<'EOF'
@@ -117,6 +118,10 @@ download_url() {
   printf 'https://github.com/%s/releases/latest/download/%s\n' "${REPO_SLUG}" "${asset_name}"
 }
 
+checksums_url() {
+  printf "${CHECKSUMS_URL}\n" "${REPO_SLUG}"
+}
+
 install_path() {
   printf '%s/pixelterm\n' "${INSTALL_DIR%/}"
 }
@@ -156,6 +161,51 @@ download_binary() {
   fi
 
   die "curl or wget is required to download PixelTerm-C"
+}
+
+download_checksums() {
+  local url
+  local destination
+
+  url="$(checksums_url)"
+  destination="$1"
+
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "${url}" -o "${destination}"
+    return 0
+  fi
+
+  if command -v wget >/dev/null 2>&1; then
+    wget -qO "${destination}" "${url}"
+    return 0
+  fi
+
+  die "curl or wget is required to download release checksums"
+}
+
+verify_checksum() {
+  local checksums_file
+  local downloaded_file
+  local asset_name
+  local expected
+  local actual
+
+  checksums_file="$1"
+  downloaded_file="$2"
+  asset_name="$3"
+
+  expected="$(grep " ${asset_name}$" "${checksums_file}" | awk '{print $1}')"
+  [ -n "${expected}" ] || die "Missing checksum for ${asset_name}"
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "${downloaded_file}" | awk '{print $1}')"
+  elif command -v shasum >/dev/null 2>&1; then
+    actual="$(shasum -a 256 "${downloaded_file}" | awk '{print $1}')"
+  else
+    die "sha256sum or shasum is required to verify PixelTerm-C"
+  fi
+
+  [ "${actual}" = "${expected}" ] || die "Checksum verification failed for ${asset_name}"
 }
 
 prepare_install_dir() {
@@ -220,6 +270,7 @@ main() {
   local url
   local destination
   local tmp_file
+  local checksum_file
   local os_name
   local arch_name
 
@@ -251,9 +302,16 @@ main() {
 
   TMP_DIR="$(mktemp -d)"
   tmp_file="${TMP_DIR}/${asset_name}"
+  checksum_file="${TMP_DIR}/SHA256SUMS"
 
   log "Downloading ${asset_name}..."
   download_binary "${tmp_file}"
+
+  log "Downloading SHA256SUMS..."
+  download_checksums "${checksum_file}"
+
+  log "Verifying checksum..."
+  verify_checksum "${checksum_file}" "${tmp_file}" "${asset_name}"
 
   log "Installing to ${destination}..."
   install_binary "${tmp_file}"

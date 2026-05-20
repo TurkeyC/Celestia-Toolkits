@@ -130,14 +130,20 @@ class InstallScriptCLITest(unittest.TestCase):
                 "#!/usr/bin/env bash\n"
                 "set -eu\n"
                 "out=''\n"
+                "url=''\n"
                 'while [ "$#" -gt 0 ]; do\n'
                 '  case "$1" in\n'
                 '    -o) out="$2"; shift 2 ;;\n'
-                "    *) shift ;;\n"
+                '    -*) shift ;;\n'
+                '    *) url="$1"; shift ;;\n'
                 "  esac\n"
                 "done\n"
-                "printf '#!/usr/bin/env bash\\nexit 0\\n' > \"$out\"\n"
-                'chmod 0755 "$out"\n',
+                "if printf '%s' \"$url\" | grep -q 'SHA256SUMS$'; then\n"
+                "  printf '%s  %s\\n' \"$(printf '#!/usr/bin/env bash\\nexit 0\\n' | sha256sum | awk '{print $1}')\" pixelterm-amd64-linux > \"$out\"\n"
+                "else\n"
+                "  printf '#!/usr/bin/env bash\\nexit 0\\n' > \"$out\"\n"
+                "  chmod 0755 \"$out\"\n"
+                "fi\n",
                 encoding="utf-8",
             )
             fake_curl.chmod(0o755)
