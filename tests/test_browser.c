@@ -57,8 +57,8 @@ static void test_browser_scan_directory_filters_and_sorts(void) {
     gchar *a_jpg = write_file_in_dir(dir, "a.jpg", k_jpeg, sizeof(k_jpeg));
     gchar *b_png = write_file_in_dir(dir, "b.png", k_png, sizeof(k_png));
     gchar *noext = write_file_in_dir(dir, "noext", k_png, sizeof(k_png));
-    write_file_in_dir(dir, "c.png", k_invalid, sizeof(k_invalid));
-    write_file_in_dir(dir, "note.txt", (const guint8 *)"text", 4);
+    gchar *c_png = write_file_in_dir(dir, "c.png", k_invalid, sizeof(k_invalid));
+    gchar *note_txt = write_file_in_dir(dir, "note.txt", (const guint8 *)"text", 4);
 
     FileBrowser *browser = browser_create();
     g_assert_nonnull(browser);
@@ -88,6 +88,8 @@ static void test_browser_scan_directory_filters_and_sorts(void) {
     g_free(a_jpg);
     g_free(b_png);
     g_free(noext);
+    g_free(c_png);
+    g_free(note_txt);
 }
 
 static void test_browser_navigation_and_delete(void) {
@@ -133,8 +135,8 @@ static void test_browser_reset(void) {
     static const guint8 k_png[] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
 
     gchar *dir = create_temp_dir();
-    write_file_in_dir(dir, "a.png", k_png, sizeof(k_png));
-    write_file_in_dir(dir, "b.png", k_png, sizeof(k_png));
+    gchar *a_png = write_file_in_dir(dir, "a.png", k_png, sizeof(k_png));
+    gchar *b_png = write_file_in_dir(dir, "b.png", k_png, sizeof(k_png));
 
     FileBrowser *browser = browser_create();
     g_assert_nonnull(browser);
@@ -147,6 +149,8 @@ static void test_browser_reset(void) {
     g_assert_cmpint(browser_get_current_index(browser), ==, 0);
 
     browser_destroy(browser);
+    g_free(a_png);
+    g_free(b_png);
 }
 
 void register_browser_tests(void) {
