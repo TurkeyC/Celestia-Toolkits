@@ -65,9 +65,9 @@ jobs:
         run: |
           make EXTRA_CFLAGS=-Werror test
 
-      - name: Validate debug AddressSanitizer build
+      - name: Run debug AddressSanitizer tests
         run: |
-          make EXTRA_CFLAGS=-Werror debug
+          make EXTRA_CFLAGS=-Werror debug-test
 
   build-and-test-macos:
     if: github.event_name == 'pull_request'
@@ -96,6 +96,6 @@ jobs:
         run: |
           make EXTRA_CFLAGS=-Werror test
 
-      - name: Validate debug AddressSanitizer build
+      - name: Run debug AddressSanitizer tests
         run: |
-          make EXTRA_CFLAGS=-Werror debug
+          make EXTRA_CFLAGS=-Werror debug-test

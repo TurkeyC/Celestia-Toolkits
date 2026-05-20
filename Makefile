@@ -177,6 +177,9 @@ $(BOOK_PREVIEW_TEST_TARGET): $(BOOK_PREVIEW_TEST_OBJECT) $(BOOK_PREVIEW_TEST_LIN
 debug: CFLAGS += $(DEBUG_CFLAGS)
 debug: clean all
 
+debug-test: CFLAGS += $(DEBUG_CFLAGS)
+debug-test: clean test
+
 # Clean build artifacts
 clean:
 	rm -rf $(OBJDIR) $(BINDIR)
@@ -215,6 +218,7 @@ help:
 	@echo "Available targets:"
 	@echo "  all       - Build the application (default)"
 	@echo "  debug     - Build with debug flags"
+	@echo "  debug-test - Run tests with debug AddressSanitizer flags"
 	@echo "  clean     - Remove build artifacts"
 	@echo "  install   - Install to system"
 	@echo "  test      - Run tests"
@@ -232,7 +236,7 @@ help:
 	@echo "  make CC=aarch64-linux-gnu-gcc ARCH=aarch64  # Full cross-compilation"
 	@echo "  make run ARGS=\"/path/to/image.jpg\"  # Run with args"
 
-.PHONY: FORCE all debug clean install test run check-deps help
+.PHONY: FORCE all debug debug-test clean install test run check-deps help
 
 FORCE:
 
