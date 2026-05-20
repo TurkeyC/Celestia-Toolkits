@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 import subprocess
 import tempfile
 import unittest
@@ -143,6 +144,8 @@ class InstallScriptCLITest(unittest.TestCase):
             fake_bin_dir = temp_path / "fake-bin"
             install_dir = temp_path / "install-bin"
             fake_bin_dir.mkdir()
+            fake_binary = b"#!/usr/bin/env bash\nexit 0\n"
+            fake_binary_sha256 = hashlib.sha256(fake_binary).hexdigest()
 
             fake_curl = fake_bin_dir / "curl"
             fake_curl.write_text(
@@ -158,7 +161,7 @@ class InstallScriptCLITest(unittest.TestCase):
                 "  esac\n"
                 "done\n"
                 "if printf '%s' \"$url\" | grep -q 'SHA256SUMS$'; then\n"
-                "  printf '%s  %s\\n' \"$(printf '#!/usr/bin/env bash\\nexit 0\\n' | sha256sum | awk '{print $1}')\" pixelterm-amd64-linux > \"$out\"\n"
+                f"  printf '%s  %s\\n' '{fake_binary_sha256}' pixelterm-amd64-linux > \"$out\"\n"
                 "else\n"
                 "  printf '#!/usr/bin/env bash\\nexit 0\\n' > \"$out\"\n"
                 "  chmod 0755 \"$out\"\n"

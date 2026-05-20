@@ -205,7 +205,7 @@ verify_checksum() {
   downloaded_file="$2"
   asset_name="$3"
 
-  expected="$(grep " ${asset_name}$" "${checksums_file}" | awk '{print $1}')"
+  expected="$(awk -v asset="${asset_name}" '$2 == asset { print $1; exit }' "${checksums_file}")"
   [ -n "${expected}" ] || die "Missing checksum for ${asset_name}"
 
   if command -v sha256sum >/dev/null 2>&1; then
