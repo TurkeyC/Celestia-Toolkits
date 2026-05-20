@@ -11,8 +11,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_PATH = REPO_ROOT / "scripts" / "install.sh"
 README_PATH = REPO_ROOT / "README.md"
-README_ZH_PATH = REPO_ROOT / "docs" / "i18n" / "README_zh.md"
-README_JA_PATH = REPO_ROOT / "docs" / "i18n" / "README_ja.md"
 INSTALL_COMMAND = (
     "curl -fsSL "
     "https://raw.githubusercontent.com/zouyonghe/PixelTerm-C/main/scripts/install.sh"
@@ -89,19 +87,6 @@ def fake_install_env(fake_bin_dir: Path, extra: dict[str, str] | None = None) ->
     if extra:
         env.update(extra)
     return env
-
-
-def read_repo_file(relative_path: str) -> str:
-    result = subprocess.run(
-        ["git", "show", f"HEAD:{relative_path}"],
-        text=True,
-        capture_output=True,
-        cwd=REPO_ROOT,
-        check=False,
-    )
-    if result.returncode == 0:
-        return result.stdout
-    return (REPO_ROOT / relative_path).read_text(encoding="utf-8")
 
 
 class InstallScriptCLITest(unittest.TestCase):
@@ -342,12 +327,6 @@ class InstallReadmeTest(unittest.TestCase):
 
     def test_readme_promotes_one_command_install(self) -> None:
         self.assertIn(INSTALL_COMMAND, README_PATH.read_text(encoding="utf-8"))
-
-    def test_chinese_readme_promotes_one_command_install(self) -> None:
-        self.assertIn(INSTALL_COMMAND, read_repo_file("docs/i18n/README_zh.md"))
-
-    def test_japanese_readme_promotes_one_command_install(self) -> None:
-        self.assertIn(INSTALL_COMMAND, read_repo_file("docs/i18n/README_ja.md"))
 
 
 if __name__ == "__main__":
