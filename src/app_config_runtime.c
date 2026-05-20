@@ -1,6 +1,10 @@
 #include "app_config_runtime.h"
 
 RendererConfig app_renderer_config_from_app(const PixelTermApp *app, gint max_width, gint max_height) {
+    if (!app) {
+        g_warning("app_renderer_config_from_app called with NULL app; using safe renderer defaults");
+    }
+
     RendererConfig config = {
         .max_width = max_width,
         .max_height = max_height,
