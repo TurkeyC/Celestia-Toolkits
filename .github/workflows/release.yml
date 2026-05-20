@@ -53,6 +53,7 @@ jobs:
         
         # Build PixelTerm-C
         make clean && make
+        make EXTRA_CFLAGS=-Werror test
         if command -v strip >/dev/null; then
           strip bin/pixelterm || true
         fi
@@ -109,6 +110,7 @@ jobs:
         
         # Build PixelTerm-C
         make clean && make
+        make EXTRA_CFLAGS=-Werror test
         if command -v strip >/dev/null; then
           strip bin/pixelterm || true
         fi
@@ -149,6 +151,10 @@ jobs:
       with:
         pattern: pixelterm*
         merge-multiple: true
+
+    - name: Generate release checksums
+      run: |
+        sha256sum pixelterm-* > SHA256SUMS
 
     - name: Prepare release notes inputs
       id: release_notes_inputs
@@ -204,6 +210,7 @@ jobs:
       with:
         body_path: ${{ steps.release_notes_inputs.outputs.output_file }}
         files: |
+          SHA256SUMS
           pixelterm-amd64-linux.tar.gz
           pixelterm-amd64-linux
           pixelterm-arm64-linux.tar.gz

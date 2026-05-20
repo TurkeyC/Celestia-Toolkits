@@ -7,16 +7,18 @@ DRY_RUN=0
 PRINT_ASSET_NAME=0
 PRINT_INSTALL_PATH=0
 TMP_DIR=""
+RELEASE_VERSION=""
 
 usage() {
   cat <<'EOF'
-Install PixelTerm-C from the latest GitHub Release.
+Install PixelTerm-C from a GitHub Release.
 
 Usage:
   bash install.sh [options]
 
 Options:
   --bin-dir <dir>       Install pixelterm into the given directory
+  --version <tag>       Install a specific release tag instead of latest
   --dry-run             Print the resolved download URL and destination
   --print-asset-name    Print the detected release asset name and exit
   --print-install-path  Print the final install path and exit
@@ -25,6 +27,7 @@ Options:
 Examples:
   curl -fsSL https://raw.githubusercontent.com/zouyonghe/PixelTerm-C/main/scripts/install.sh | bash
   curl -fsSL https://raw.githubusercontent.com/zouyonghe/PixelTerm-C/main/scripts/install.sh | bash -s -- --bin-dir "$HOME/.local/bin"
+  curl -fsSL https://raw.githubusercontent.com/zouyonghe/PixelTerm-C/main/scripts/install.sh | bash -s -- --version v1.7.26
 EOF
 }
 
@@ -111,10 +114,23 @@ release_asset_name() {
   printf 'pixelterm-%s-%s\n' "${arch_name}" "${os_name}"
 }
 
+release_selector() {
+  if [ -n "${RELEASE_VERSION}" ] && [ "${RELEASE_VERSION}" != "latest" ]; then
+    printf 'download/%s' "${RELEASE_VERSION}"
+    return
+  fi
+
+  printf 'latest/download'
+}
+
 download_url() {
   local asset_name
   asset_name="$(release_asset_name)"
-  printf 'https://github.com/%s/releases/latest/download/%s\n' "${REPO_SLUG}" "${asset_name}"
+  printf 'https://github.com/%s/releases/%s/%s\n' "${REPO_SLUG}" "$(release_selector)" "${asset_name}"
+}
+
+checksums_url() {
+  printf 'https://github.com/%s/releases/%s/SHA256SUMS\n' "${REPO_SLUG}" "$(release_selector)"
 }
 
 install_path() {
@@ -138,12 +154,12 @@ run_privileged() {
   die "Install target is not writable and sudo is not available"
 }
 
-download_binary() {
+download_file() {
   local url
   local destination
 
-  url="$(download_url)"
-  destination="$1"
+  url="$1"
+  destination="$2"
 
   if command -v curl >/dev/null 2>&1; then
     curl -fsSL "${url}" -o "${destination}"
@@ -156,6 +172,39 @@ download_binary() {
   fi
 
   die "curl or wget is required to download PixelTerm-C"
+}
+
+download_binary() {
+  download_file "$(download_url)" "$1"
+}
+
+download_checksums() {
+  download_file "$(checksums_url)" "$1"
+}
+
+verify_checksum() {
+  local checksums_file
+  local downloaded_file
+  local asset_name
+  local expected
+  local actual
+
+  checksums_file="$1"
+  downloaded_file="$2"
+  asset_name="$3"
+
+  expected="$(awk -v asset="${asset_name}" '$2 == asset { print $1; exit }' "${checksums_file}")"
+  [ -n "${expected}" ] || die "Missing checksum for ${asset_name}"
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual="$(sha256sum "${downloaded_file}" | awk '{print $1}')"
+  elif command -v shasum >/dev/null 2>&1; then
+    actual="$(shasum -a 256 "${downloaded_file}" | awk '{print $1}')"
+  else
+    die "sha256sum or shasum is required to verify PixelTerm-C"
+  fi
+
+  [ "${actual}" = "${expected}" ] || die "Checksum verification failed for ${asset_name}"
 }
 
 prepare_install_dir() {
@@ -192,6 +241,11 @@ parse_args() {
         INSTALL_DIR="$2"
         shift 2
         ;;
+      --version)
+        [ "$#" -ge 2 ] || die "Missing value for --version"
+        RELEASE_VERSION="$2"
+        shift 2
+        ;;
       --dry-run)
         DRY_RUN=1
         shift
@@ -220,6 +274,7 @@ main() {
   local url
   local destination
   local tmp_file
+  local checksum_file
   local os_name
   local arch_name
 
@@ -243,6 +298,11 @@ main() {
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     log "Resolved platform: ${os_name}/${arch_name}"
+    if [ -n "${RELEASE_VERSION}" ]; then
+      log "Release version: ${RELEASE_VERSION}"
+    else
+      log "Release version: latest"
+    fi
     log "Release asset: ${asset_name}"
     log "Download URL: ${url}"
     log "Install destination: ${destination}"
@@ -251,9 +311,16 @@ main() {
 
   TMP_DIR="$(mktemp -d)"
   tmp_file="${TMP_DIR}/${asset_name}"
+  checksum_file="${TMP_DIR}/SHA256SUMS"
 
   log "Downloading ${asset_name}..."
   download_binary "${tmp_file}"
+
+  log "Downloading SHA256SUMS..."
+  download_checksums "${checksum_file}"
+
+  log "Verifying checksum..."
+  verify_checksum "${checksum_file}" "${tmp_file}" "${asset_name}"
 
   log "Installing to ${destination}..."
   install_binary "${tmp_file}"

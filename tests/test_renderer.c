@@ -194,6 +194,7 @@ static void test_renderer_cache_roundtrip(void) {
     renderer_cache_clear(renderer);
     g_assert_null(renderer_cache_get(renderer, "path"));
 
+    g_string_free(rendered, TRUE);
     renderer_destroy(renderer);
 }
 

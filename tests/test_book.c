@@ -215,6 +215,7 @@ static void test_book_open_rejects_directory_path(void) {
 
     g_assert_null(doc);
     g_assert_cmpint(error, ==, ERROR_FILE_NOT_FOUND);
+    g_free(dir_path);
 }
 
 static void test_book_open_rejects_invalid_book_bytes(void) {

@@ -35,6 +35,15 @@ static void test_sanitize_for_terminal_replaces_c1_controls(void) {
     g_free(result);
 }
 
+static void test_sanitize_for_terminal_replaces_escape_and_preserves_utf8(void) {
+    const gchar *input = "文\033字";
+    gchar *result = sanitize_for_terminal(input);
+
+    g_assert_nonnull(result);
+    g_assert_cmpstr(result, ==, "文?字");
+    g_free(result);
+}
+
 static void test_sanitize_for_terminal_preserves_valid_utf8(void) {
     const gchar *input = "中文 日本語 emoji 😀";
     gchar *result = sanitize_for_terminal(input);
@@ -161,6 +170,7 @@ void register_text_utils_tests(void) {
     g_test_add_func("/text_utils/sanitize/simple", test_sanitize_for_terminal_simple);
     g_test_add_func("/text_utils/sanitize/empty", test_sanitize_for_terminal_empty);
     g_test_add_func("/text_utils/sanitize/c1_controls", test_sanitize_for_terminal_replaces_c1_controls);
+    g_test_add_func("/text_utils/sanitize/escape_and_utf8", test_sanitize_for_terminal_replaces_escape_and_preserves_utf8);
     g_test_add_func("/text_utils/sanitize/preserves_valid_utf8", test_sanitize_for_terminal_preserves_valid_utf8);
 
     // utf8_display_width tests

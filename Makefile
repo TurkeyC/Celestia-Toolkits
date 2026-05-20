@@ -5,6 +5,7 @@ INSTALL ?= install
 VERSION = $(shell git describe --tags --exact-match 2>/dev/null || git describe --tags --always --dirty 2>/dev/null | cut -d'-' -f1 | cut -c2- || echo "unknown")
 CFLAGS = -Wall -Wextra -std=c11 -O2 -Wno-sign-compare -Wno-unused-variable -Wno-unused-but-set-variable -Wno-switch -DAPP_VERSION=\"$(VERSION)\"
 DEBUG_CFLAGS = -g -DDEBUG -fsanitize=address
+DEBUG ?= 0
 EXTRA_CFLAGS ?=
 DEPFLAGS = -MMD -MP
 # Prefer the locally installed Chafa when both system and /usr/local versions exist
@@ -28,6 +29,9 @@ ifeq ($(UNAME_S),Linux)
   LDFLAGS += -Wl,--gc-sections
 else ifeq ($(UNAME_S),Darwin)
   LDFLAGS += -Wl,-dead_strip
+endif
+ifeq ($(DEBUG),1)
+  CFLAGS += $(DEBUG_CFLAGS)
 endif
 EXTRA_LIBS =
 ifneq ($(shell $(PKG_CONFIG_CMD) --exists zlib >/dev/null 2>&1 && echo yes),)
@@ -93,6 +97,8 @@ endif
 SRCDIR = src
 OBJDIR = obj
 BINDIR = bin
+DEBUG_OBJDIR ?= obj-debug
+DEBUG_BINDIR ?= bin-debug
 BUILD_FLAGS_FILE = $(OBJDIR)/.build-flags
 
 # Source files
@@ -138,15 +144,16 @@ $(BINDIR):
 
 $(BUILD_FLAGS_FILE): FORCE | $(OBJDIR)
 	@{ \
+		tmp_file="$@.$$$$.tmp"; \
 		printf '%s\n' \
 			'CC=$(CC)' \
 			'CFLAGS=$(CFLAGS)' \
 			'EXTRA_CFLAGS=$(EXTRA_CFLAGS)' \
 			'INCLUDES=$(INCLUDES)' \
 			'LDFLAGS=$(LDFLAGS)' \
-			'LIBS=$(LIBS)'; \
-	} > $@.tmp
-	@if [ ! -f $@ ] || ! cmp -s $@.tmp $@; then mv $@.tmp $@; else rm -f $@.tmp; fi
+			'LIBS=$(LIBS)' > "$${tmp_file}"; \
+		if [ ! -f $@ ] || ! cmp -s "$${tmp_file}" $@; then mv "$${tmp_file}" $@; else rm -f "$${tmp_file}"; fi; \
+	}
 
 # Build the main executable
 $(TARGET): $(OBJECTS) $(BUILD_FLAGS_FILE) | $(BINDIR)
@@ -174,12 +181,15 @@ $(BOOK_PREVIEW_TEST_TARGET): $(BOOK_PREVIEW_TEST_OBJECT) $(BOOK_PREVIEW_TEST_LIN
 	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $(BOOK_PREVIEW_TEST_OBJECT) $(BOOK_PREVIEW_TEST_LINK_OBJECTS) $(LIBS)
 
 # Debug build
-debug: CFLAGS += $(DEBUG_CFLAGS)
-debug: clean all
+debug:
+	$(MAKE) OBJDIR="$(DEBUG_OBJDIR)" BINDIR="$(DEBUG_BINDIR)" DEBUG=1 EXTRA_CFLAGS="$(EXTRA_CFLAGS)" all
+
+debug-test:
+	$(MAKE) OBJDIR="$(DEBUG_OBJDIR)" BINDIR="$(DEBUG_BINDIR)" DEBUG=1 EXTRA_CFLAGS="$(EXTRA_CFLAGS)" test
 
 # Clean build artifacts
 clean:
-	rm -rf $(OBJDIR) $(BINDIR)
+	rm -rf $(OBJDIR) $(BINDIR) $(DEBUG_OBJDIR) $(DEBUG_BINDIR)
 
 # Install
 install: $(TARGET)
@@ -215,6 +225,7 @@ help:
 	@echo "Available targets:"
 	@echo "  all       - Build the application (default)"
 	@echo "  debug     - Build with debug flags"
+	@echo "  debug-test - Run tests with debug AddressSanitizer flags"
 	@echo "  clean     - Remove build artifacts"
 	@echo "  install   - Install to system"
 	@echo "  test      - Run tests"
@@ -232,7 +243,7 @@ help:
 	@echo "  make CC=aarch64-linux-gnu-gcc ARCH=aarch64  # Full cross-compilation"
 	@echo "  make run ARGS=\"/path/to/image.jpg\"  # Run with args"
 
-.PHONY: FORCE all debug clean install test run check-deps help
+.PHONY: FORCE all debug debug-test clean install test run check-deps help
 
 FORCE:
 
