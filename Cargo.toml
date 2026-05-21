@@ -1,0 +1,20 @@
+[package]
+name = "kitim"
+version = "0.1.0"
+edition = "2021"
+description = "A terminal-based image viewer and video player using the Kitty graphics protocol"
+license = "MIT"
+repository = "https://github.com/wensheng/kitim"
+readme = "README.md"
+keywords = ["cli", "utility", "image", "video"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+clap = { version = "4.6", features = ["derive"] }
+crossterm = "0.29"
+image = "0.25"
+ctrlc = "3.5"
+base64 = "0.22"
+cpal = "0.17"
+ringbuf = "0.5"
+
