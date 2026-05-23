@@ -1,6 +1,7 @@
 use crate::config::Config;
 use crate::ffmpeg::*;
 use crate::kitty;
+use crate::playback_control;
 use std::ffi::{CString, c_int};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -18,11 +19,7 @@ enum VideoMessage {
 
 pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Set up Ctrl-C handler for graceful exit and cleanup
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-    })?;
+    let running = playback_control::install_ctrlc_handler()?;
 
     unsafe {
         av_log_set_level(AV_LOG_QUIET);
@@ -258,31 +255,6 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
         let target_w_px = target_cols * 10;
         let target_h_px = target_rows * 20;
 
-        // Initialize SwsContext
-        let src_format = (*video_codecpar_ptr).format;
-        let sws_ctx = sws_getContext(
-            orig_w,
-            orig_h,
-            src_format,
-            target_w_px as i32,
-            target_h_px as i32,
-            AV_PIX_FMT_RGBA,
-            SWS_BILINEAR,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            std::ptr::null(),
-        );
-
-        if sws_ctx.is_null() {
-            if has_audio {
-                swr_free(&mut swr_ctx);
-                avcodec_free_context(&mut audio_codec_ctx);
-            }
-            avcodec_free_context(&mut { codec_ctx });
-            avformat_close_input(&mut format_ctx);
-            return Err("Could not initialize software scaler".into());
-        }
-
         // Determine frame delay (timing)
         let fps_rational = (*video_stream_ptr).avg_frame_rate;
         let delay_secs = if fps_rational.num > 0 && fps_rational.den > 0 {
@@ -320,6 +292,8 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
             0,
             0,
         ];
+        let mut sws_ctx: *mut SwsContext = std::ptr::null_mut();
+        let mut playback_error: Option<String> = None;
 
         // Pre-allocate terminal rows to prevent scrolling drift during playback
         for _ in 0..target_rows {
@@ -338,7 +312,7 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
         let (video_sender, video_receiver) = std::sync::mpsc::sync_channel::<VideoMessage>(video_channel_capacity);
 
         // Spawn video rendering thread
-        let running_render = running.clone();
+        let running_render = running;
         let audio_clock_render = audio_clock.clone();
         let has_audio_render = has_audio;
         let target_channels_render = target_channels;
@@ -437,13 +411,55 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
                                 0.0
                             };
 
+                            if sws_ctx.is_null() {
+                                let frame_w = if (*frame).width > 0 {
+                                    (*frame).width
+                                } else {
+                                    orig_w
+                                };
+                                let frame_h = if (*frame).height > 0 {
+                                    (*frame).height
+                                } else {
+                                    orig_h
+                                };
+                                let frame_format = (*frame).format;
+
+                                sws_ctx = sws_getContext(
+                                    frame_w,
+                                    frame_h,
+                                    frame_format,
+                                    target_w_px as i32,
+                                    target_h_px as i32,
+                                    AV_PIX_FMT_RGBA,
+                                    SWS_BILINEAR,
+                                    std::ptr::null_mut(),
+                                    std::ptr::null_mut(),
+                                    std::ptr::null(),
+                                );
+
+                                if sws_ctx.is_null() {
+                                    running.store(false, Ordering::SeqCst);
+                                    playback_error = Some(format!(
+                                        "Could not initialize software scaler for decoded frame format {}",
+                                        frame_format
+                                    ));
+                                    break;
+                                }
+                            }
+
+                            let frame_h = if (*frame).height > 0 {
+                                (*frame).height
+                            } else {
+                                orig_h
+                            };
+
                             // Convert/scale frame to RGBA output_buffer
                             sws_scale(
                                 sws_ctx,
                                 (*frame).data.as_ptr() as *const *const u8,
                                 (*frame).linesize.as_ptr(),
                                 0,
-                                orig_h,
+                                frame_h,
                                 dst_data.as_ptr() as *const *mut u8,
                                 dst_linesize.as_ptr(),
                             );
@@ -500,9 +516,12 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
                     }
                 }
                 av_packet_unref(pkt);
+                if playback_error.is_some() {
+                    break;
+                }
             }
 
-            if config.loop_video && running.load(Ordering::SeqCst) {
+            if config.loop_video && running.load(Ordering::SeqCst) && playback_error.is_none() {
                 // Seek back to start
                 av_seek_frame(format_ctx, video_stream_index, 0, 4); // 4 = AVSEEK_FLAG_ANY
                 avcodec_flush_buffers(codec_ctx);
@@ -529,7 +548,9 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
         if !audio_frame.is_null() {
             av_frame_free(&mut { audio_frame });
         }
-        sws_freeContext(sws_ctx);
+        if !sws_ctx.is_null() {
+            sws_freeContext(sws_ctx);
+        }
         if !swr_ctx.is_null() {
             swr_free(&mut swr_ctx);
         }
@@ -550,7 +571,10 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
         let _ = kitty::write_all_robust(&mut stdout, &buf);
         let _ = kitty::flush_robust(&mut stdout);
         println!();
+
+        if let Some(err) = playback_error {
+            return Err(err.into());
+        }
     }
     Ok(())
 }
-

@@ -1,7 +1,9 @@
+mod audio_player;
 mod config;
 mod ffmpeg;
 mod image_viewer;
 mod kitty;
+mod playback_control;
 mod video_player;
 
 use clap::Parser;
@@ -21,19 +23,31 @@ fn main() {
 
         // Common video formats
         let is_video_ext = match ext.as_str() {
-            "mp4" | "mkv" | "avi" | "mov" | "webm" | "flv" | "wmv" | "m4v" | "mpg" | "mpeg" | "3gp" => true,
+            "mp4" | "mkv" | "avi" | "mov" | "webm" | "flv" | "wmv" | "m4v" | "mpg" | "mpeg"
+            | "3gp" => true,
+            _ => false,
+        };
+
+        // Common audio formats
+        let is_audio_ext = match ext.as_str() {
+            "mp3" | "m4a" | "aac" | "wav" | "flac" | "ogg" | "opus" | "wma" | "alac" | "aiff"
+            | "aif" => true,
             _ => false,
         };
 
         let result = if is_video_ext {
             video_player::play(&config, file)
+        } else if is_audio_ext {
+            audio_player::play(&config, file)
         } else {
-            // Try as image, fallback to video if it fails
+            // Try as image, then fall back through FFmpeg-backed video and audio decoders.
             match image_viewer::view(&config, file) {
                 Ok(_) => Ok(()),
                 Err(_) => {
-                    // Try fallback to video decoder
-                    video_player::play(&config, file)
+                    match video_player::play(&config, file) {
+                        Ok(_) => Ok(()),
+                        Err(_) => audio_player::play(&config, file),
+                    }
                 }
             }
         };

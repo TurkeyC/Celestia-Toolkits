@@ -1,9 +1,13 @@
 use clap::Parser;
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "viewim", version, about = "Kitty graphics-based terminal image viewer and video player")]
+#[command(
+    name = "viewim",
+    version,
+    about = "Kitty graphics-based terminal image, audio, and video player"
+)]
 pub struct Config {
-    /// The image or video files to display
+    /// The image, audio, or video files to display/play
     #[arg(required = true)]
     pub files: Vec<String>,
 
@@ -15,7 +19,7 @@ pub struct Config {
     #[arg(short = 'f', long = "frame-rate")]
     pub fps: Option<f32>,
 
-    /// Loop video or GIF playback continuously
+    /// Loop video, GIF, or audio playback continuously
     #[arg(short = 'l', long = "loop")]
     pub loop_video: bool,
 }

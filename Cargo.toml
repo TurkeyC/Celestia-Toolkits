@@ -1,12 +1,12 @@
 [package]
 name = "kitim"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "A terminal-based image viewer and video player using the Kitty graphics protocol"
+description = "A terminal-based image viewer, audio and video player using the Kitty graphics protocol"
 license = "MIT"
 repository = "https://github.com/wensheng/kitim"
 readme = "README.md"
-keywords = ["cli", "utility", "image", "video"]
+keywords = ["cli", "utility", "image", "audio", "video"]
 categories = ["command-line-utilities"]
 
 [dependencies]
@@ -17,4 +17,3 @@ ctrlc = "3.5"
 base64 = "0.22"
 cpal = "0.17"
 ringbuf = "0.5"
-
