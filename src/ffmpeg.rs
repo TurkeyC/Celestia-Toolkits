@@ -34,6 +34,9 @@ pub struct AVRational {
     pub den: c_int,
 }
 
+// FFmpeg 7.x+ AVCodecParameters: coded_side_data was moved up next to extradata_size
+// and the deprecated channel_layout/channels fields were removed.
+#[cfg(not(ffmpeg_old_channel_layout))]
 #[repr(C)]
 pub struct AVCodecParameters {
     pub codec_type: c_int,
@@ -56,6 +59,49 @@ pub struct AVCodecParameters {
     pub _pad3: [u8; 48],
     pub ch_layout: AVChannelLayout,
     pub sample_rate: c_int,
+}
+
+// FFmpeg 6.x AVCodecParameters: coded_side_data lives at the end of the struct and the
+// deprecated channel_layout/channels are still present (FF_API_OLD_CHANNEL_LAYOUT).
+#[cfg(ffmpeg_old_channel_layout)]
+#[repr(C)]
+pub struct AVCodecParameters {
+    pub codec_type: c_int,
+    pub codec_id: u32,
+    pub codec_tag: u32,
+    // implicit 4-byte pad here for 8-byte ptr alignment
+    pub extradata: *mut u8,
+    pub extradata_size: c_int,
+    pub format: c_int,
+    pub bit_rate: i64,
+    pub bits_per_coded_sample: c_int,
+    pub bits_per_raw_sample: c_int,
+    pub profile: c_int,
+    pub level: c_int,
+    pub width: c_int,
+    pub height: c_int,
+    pub sample_aspect_ratio: AVRational,
+    pub field_order: c_int,
+    pub color_range: c_int,
+    pub color_primaries: c_int,
+    pub color_trc: c_int,
+    pub color_space: c_int,
+    pub chroma_location: c_int,
+    pub video_delay: c_int,
+    // implicit 4-byte pad here for 8-byte u64 alignment
+    pub channel_layout: u64,         // deprecated, FF_API_OLD_CHANNEL_LAYOUT
+    pub channels: c_int,             // deprecated, FF_API_OLD_CHANNEL_LAYOUT
+    pub sample_rate: c_int,
+    pub block_align: c_int,
+    pub frame_size: c_int,
+    pub initial_padding: c_int,
+    pub trailing_padding: c_int,
+    pub seek_preroll: c_int,
+    // implicit 4-byte pad here for 8-byte AVChannelLayout alignment
+    pub ch_layout: AVChannelLayout,
+    pub framerate: AVRational,
+    pub coded_side_data: *mut c_void,
+    pub nb_coded_side_data: c_int,
 }
 
 #[repr(C)]
@@ -114,6 +160,9 @@ pub struct AVCodecContext {
     // doesn't need the exact struct size, just the pointer.
 }
 
+// FFmpeg 7.x+ AVFrame: many deprecated fields (key_frame, coded_picture_number,
+// interlaced_frame, palette_has_changed, reordered_opaque, channel_layout) were removed.
+#[cfg(not(ffmpeg_old_channel_layout))]
 #[repr(C)]
 pub struct AVFrame {
     pub data: [*mut u8; 8],
@@ -129,6 +178,31 @@ pub struct AVFrame {
     pub sample_rate: c_int,
     pub _pad2: [u8; 200],
     pub ch_layout: AVChannelLayout,
+}
+
+// FFmpeg 6.x AVFrame: extra deprecated fields between pts and sample_rate push
+// sample_rate further back by 28 bytes (key_frame/pict_struct/etc. between format
+// and pts, and coded_picture_number/display_picture_number/interlaced_frame/
+// top_field_first/palette_has_changed/reordered_opaque after time_base).
+#[cfg(ffmpeg_old_channel_layout)]
+#[repr(C)]
+pub struct AVFrame {
+    pub data: [*mut u8; 8],
+    pub linesize: [c_int; 8],
+    pub extended_data: *mut *mut u8,
+    pub width: c_int,
+    pub height: c_int,
+    pub nb_samples: c_int,
+    pub format: c_int,
+    // key_frame (4) + pict_type (4) + sample_aspect_ratio (8) = 16 bytes before pts
+    pub _pad_pts: [u8; 16],
+    pub pts: i64,
+    // pkt_dts (8) + time_base (8) + coded_picture_number (4) + display_picture_number (4)
+    // + quality (4) + pad (4) + opaque (8) + repeat_pict (4) + interlaced_frame (4)
+    // + top_field_first (4) + palette_has_changed (4) + pad (4) + reordered_opaque (8)
+    // = 68 bytes between pts and sample_rate, but pts ends at +8, so padding is 64.
+    pub _pad1: [u8; 64],
+    pub sample_rate: c_int,
 }
 
 #[repr(C)]

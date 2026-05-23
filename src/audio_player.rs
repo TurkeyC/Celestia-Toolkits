@@ -87,6 +87,7 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
             return Err("Could not open audio codec".into());
         }
 
+        let audio_setup_ctrlc = playback_control::hard_exit_on_ctrlc();
         let host = cpal::default_host();
         let device = match host.default_output_device() {
             Some(device) => device,
@@ -147,58 +148,16 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
             avformat_close_input(&mut format_ctx);
             return Err(format!("Could not start audio output stream: {}", err).into());
         }
-
-        let mut swr_ctx: *mut SwrContext = std::ptr::null_mut();
-        let mut in_ch_layout = AVChannelLayout::default();
-        if (*audio_codecpar_ptr).ch_layout.nb_channels > 0 {
-            av_channel_layout_copy(&mut in_ch_layout, &(*audio_codecpar_ptr).ch_layout);
-        } else {
-            av_channel_layout_default(&mut in_ch_layout, 2);
-        }
-
-        let mut out_ch_layout = AVChannelLayout::default();
-        av_channel_layout_default(&mut out_ch_layout, target_channels as c_int);
+        drop(audio_setup_ctrlc);
 
         let input_sample_rate = (*audio_codecpar_ptr).sample_rate;
         if input_sample_rate <= 0 {
-            av_channel_layout_uninit(&mut in_ch_layout);
-            av_channel_layout_uninit(&mut out_ch_layout);
             avcodec_free_context(&mut audio_codec_ctx);
             avformat_close_input(&mut format_ctx);
             return Err("Audio stream has no sample rate".into());
         }
 
-        let ret = swr_alloc_set_opts2(
-            &mut swr_ctx,
-            &out_ch_layout,
-            AV_SAMPLE_FMT_FLT,
-            target_sample_rate as c_int,
-            &in_ch_layout,
-            (*audio_codecpar_ptr).format,
-            input_sample_rate,
-            0,
-            std::ptr::null_mut(),
-        );
-
-        av_channel_layout_uninit(&mut in_ch_layout);
-        av_channel_layout_uninit(&mut out_ch_layout);
-
-        if ret < 0 || swr_ctx.is_null() {
-            if !swr_ctx.is_null() {
-                swr_free(&mut swr_ctx);
-            }
-            avcodec_free_context(&mut audio_codec_ctx);
-            avformat_close_input(&mut format_ctx);
-            return Err("Could not configure audio resampler".into());
-        }
-
-        let ret = swr_init(swr_ctx);
-        if ret < 0 {
-            swr_free(&mut swr_ctx);
-            avcodec_free_context(&mut audio_codec_ctx);
-            avformat_close_input(&mut format_ctx);
-            return Err("Could not initialize audio resampler".into());
-        }
+        let mut swr_ctx: *mut SwrContext = std::ptr::null_mut();
 
         let pkt = av_packet_alloc();
         if pkt.is_null() {
@@ -234,13 +193,14 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
                         queued_samples += receive_and_queue_audio(
                             audio_codec_ctx,
                             audio_frame,
-                            swr_ctx,
+                            &mut swr_ctx,
+                            audio_codecpar_ptr,
                             input_sample_rate,
                             target_sample_rate,
                             target_channels,
                             &mut audio_producer,
                             running,
-                        );
+                        )?;
                     }
                 }
 
@@ -252,13 +212,14 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
                 queued_samples += receive_and_queue_audio(
                     audio_codec_ctx,
                     audio_frame,
-                    swr_ctx,
+                    &mut swr_ctx,
+                    audio_codecpar_ptr,
                     input_sample_rate,
                     target_sample_rate,
                     target_channels,
                     &mut audio_producer,
                     running,
-                );
+                )?;
             }
 
             if config.loop_video && running.load(Ordering::SeqCst) {
@@ -287,13 +248,14 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
 unsafe fn receive_and_queue_audio<P: Producer<Item = f32>>(
     audio_codec_ctx: *mut AVCodecContext,
     audio_frame: *mut AVFrame,
-    swr_ctx: *mut SwrContext,
+    swr_ctx: &mut *mut SwrContext,
+    audio_codecpar_ptr: *mut AVCodecParameters,
     input_sample_rate: c_int,
     target_sample_rate: u32,
     target_channels: u16,
     audio_producer: &mut P,
     running: &AtomicBool,
-) -> u64 {
+) -> Result<u64, String> {
     let mut queued_samples = 0u64;
 
     while avcodec_receive_frame(audio_codec_ctx, audio_frame) == 0 {
@@ -308,6 +270,44 @@ unsafe fn receive_and_queue_audio<P: Producer<Item = f32>>(
         };
         if frame_sample_rate <= 0 {
             continue;
+        }
+
+        if (*swr_ctx).is_null() {
+            let frame_format = (*audio_frame).format;
+            let mut in_ch_layout = AVChannelLayout::default();
+            if (*audio_codecpar_ptr).ch_layout.nb_channels > 0 {
+                av_channel_layout_copy(&mut in_ch_layout, &(*audio_codecpar_ptr).ch_layout);
+            } else {
+                av_channel_layout_default(&mut in_ch_layout, 2);
+            }
+
+            let mut out_ch_layout = AVChannelLayout::default();
+            av_channel_layout_default(&mut out_ch_layout, target_channels as c_int);
+
+            let ret = swr_alloc_set_opts2(
+                swr_ctx,
+                &out_ch_layout,
+                AV_SAMPLE_FMT_FLT,
+                target_sample_rate as c_int,
+                &in_ch_layout,
+                frame_format,
+                frame_sample_rate,
+                0,
+                std::ptr::null_mut(),
+            );
+
+            av_channel_layout_uninit(&mut in_ch_layout);
+            av_channel_layout_uninit(&mut out_ch_layout);
+
+            if ret < 0 || (*swr_ctx).is_null() || swr_init(*swr_ctx) < 0 {
+                if !(*swr_ctx).is_null() {
+                    swr_free(swr_ctx);
+                }
+                return Err(format!(
+                    "Could not initialize audio resampler for decoded sample format {}",
+                    frame_format
+                ));
+            }
         }
 
         let max_out_samples = ((*audio_frame).nb_samples as i64 * target_sample_rate as i64
@@ -326,7 +326,7 @@ unsafe fn receive_and_queue_audio<P: Producer<Item = f32>>(
         };
 
         let converted = swr_convert(
-            swr_ctx,
+            *swr_ctx,
             out_ptrs.as_mut_ptr(),
             max_out_samples,
             in_ptrs,
@@ -353,5 +353,5 @@ unsafe fn receive_and_queue_audio<P: Producer<Item = f32>>(
         }
     }
 
-    queued_samples
+    Ok(queued_samples)
 }

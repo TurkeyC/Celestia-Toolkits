@@ -2,15 +2,15 @@ use crate::config::Config;
 use crate::ffmpeg::*;
 use crate::kitty;
 use crate::playback_control;
-use std::ffi::{CString, c_int};
+use std::ffi::{c_int, CString};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 // CPAL and Ringbuf imports
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use ringbuf::traits::{Consumer, Producer, Split};
 use ringbuf::HeapRb;
-use ringbuf::traits::{Producer, Consumer, Split};
 
 enum VideoMessage {
     Frame { rgba: Vec<u8>, pts: f64 },
@@ -122,7 +122,8 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
                         audio_codec_ctx = std::ptr::null_mut();
                         has_audio = false;
                     } else {
-                        let ret = avcodec_open2(audio_codec_ctx, audio_decoder, std::ptr::null_mut());
+                        let ret =
+                            avcodec_open2(audio_codec_ctx, audio_decoder, std::ptr::null_mut());
                         if ret < 0 {
                             avcodec_free_context(&mut audio_codec_ctx);
                             audio_codec_ctx = std::ptr::null_mut();
@@ -144,6 +145,7 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
         let mut audio_producer = None;
 
         if has_audio {
+            let audio_setup_ctrlc = playback_control::hard_exit_on_ctrlc();
             let host = cpal::default_host();
             if let Some(device) = host.default_output_device() {
                 if let Ok(config_supported) = device.default_output_config() {
@@ -152,7 +154,9 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
                     target_sample_rate = audio_config.sample_rate;
 
                     // Heap-allocated ring buffer
-                    let rb = HeapRb::<f32>::new(target_sample_rate as usize * 2);
+                    let rb = HeapRb::<f32>::new(
+                        (target_sample_rate as usize * target_channels as usize * 2).max(1),
+                    );
                     let (prod, mut cons) = rb.split();
                     audio_producer = Some(prod);
 
@@ -186,47 +190,6 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
                     if let Ok(stream) = stream_res {
                         if stream.play().is_ok() {
                             _cpal_stream = Some(stream);
-
-                            // Configure SwrContext
-                            let mut in_ch_layout = AVChannelLayout::default();
-                            if (*audio_codecpar_ptr).ch_layout.nb_channels > 0 {
-                                av_channel_layout_copy(&mut in_ch_layout, &(*audio_codecpar_ptr).ch_layout);
-                            } else {
-                                av_channel_layout_default(&mut in_ch_layout, 2);
-                            }
-
-                            let mut out_ch_layout = AVChannelLayout::default();
-                            av_channel_layout_default(&mut out_ch_layout, target_channels as c_int);
-
-                            let ret = swr_alloc_set_opts2(
-                                &mut swr_ctx,
-                                &out_ch_layout,
-                                AV_SAMPLE_FMT_FLT,
-                                target_sample_rate as c_int,
-                                &in_ch_layout,
-                                (*audio_codecpar_ptr).format,
-                                (*audio_codecpar_ptr).sample_rate,
-                                0,
-                                std::ptr::null_mut(),
-                            );
-
-                            av_channel_layout_uninit(&mut in_ch_layout);
-                            av_channel_layout_uninit(&mut out_ch_layout);
-
-                            if ret >= 0 && !swr_ctx.is_null() {
-                                let init_ret = swr_init(swr_ctx);
-                                if init_ret < 0 {
-                                    swr_free(&mut swr_ctx);
-                                    _cpal_stream = None;
-                                    has_audio = false;
-                                }
-                            } else {
-                                if !swr_ctx.is_null() {
-                                    swr_free(&mut swr_ctx);
-                                }
-                                _cpal_stream = None;
-                                has_audio = false;
-                            }
                         } else {
                             has_audio = false;
                         }
@@ -239,6 +202,7 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
             } else {
                 has_audio = false;
             }
+            drop(audio_setup_ctrlc);
         }
 
         // Calculate size and aspect ratio for Video
@@ -269,7 +233,11 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
 
         let pkt = av_packet_alloc();
         let frame = av_frame_alloc();
-        let audio_frame = if has_audio { av_frame_alloc() } else { std::ptr::null_mut() };
+        let audio_frame = if has_audio {
+            av_frame_alloc()
+        } else {
+            std::ptr::null_mut()
+        };
 
         let mut output_buffer = vec![0u8; (target_w_px * target_h_px * 4) as usize];
         let dst_data: [*mut u8; 8] = [
@@ -282,16 +250,7 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
             std::ptr::null_mut(),
             std::ptr::null_mut(),
         ];
-        let dst_linesize: [c_int; 8] = [
-            (target_w_px * 4) as c_int,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-        ];
+        let dst_linesize: [c_int; 8] = [(target_w_px * 4) as c_int, 0, 0, 0, 0, 0, 0, 0];
         let mut sws_ctx: *mut SwsContext = std::ptr::null_mut();
         let mut playback_error: Option<String> = None;
 
@@ -309,7 +268,8 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
         // throttles the demuxer to real-time. If there is no audio, we use a small capacity (16 frames)
         // to throttle the demuxer to the rendering thread's consumption speed.
         let video_channel_capacity = if has_audio { 1024 } else { 16 };
-        let (video_sender, video_receiver) = std::sync::mpsc::sync_channel::<VideoMessage>(video_channel_capacity);
+        let (video_sender, video_receiver) =
+            std::sync::mpsc::sync_channel::<VideoMessage>(video_channel_capacity);
 
         // Spawn video rendering thread
         let running_render = running;
@@ -342,7 +302,9 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
 
                         if has_audio_render {
                             let played_samples = audio_clock_render.load(Ordering::SeqCst);
-                            let audio_time_played = played_samples as f64 / (target_channels_render as f64 * target_sample_rate_render as f64);
+                            let audio_time_played = played_samples as f64
+                                / (target_channels_render as f64
+                                    * target_sample_rate_render as f64);
                             let diff = relative_video_time - audio_time_played;
 
                             if diff > 0.010 {
@@ -479,14 +441,77 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
                                 break;
                             }
 
+                            let frame_sample_rate = if (*audio_frame).sample_rate > 0 {
+                                (*audio_frame).sample_rate
+                            } else {
+                                (*audio_codecpar_ptr).sample_rate
+                            };
+                            if frame_sample_rate <= 0 {
+                                continue;
+                            }
+
+                            if swr_ctx.is_null() {
+                                let frame_format = (*audio_frame).format;
+                                let mut in_ch_layout = AVChannelLayout::default();
+                                if (*audio_codecpar_ptr).ch_layout.nb_channels > 0 {
+                                    av_channel_layout_copy(
+                                        &mut in_ch_layout,
+                                        &(*audio_codecpar_ptr).ch_layout,
+                                    );
+                                } else {
+                                    av_channel_layout_default(&mut in_ch_layout, 2);
+                                }
+
+                                let mut out_ch_layout = AVChannelLayout::default();
+                                av_channel_layout_default(
+                                    &mut out_ch_layout,
+                                    target_channels as c_int,
+                                );
+
+                                let ret = swr_alloc_set_opts2(
+                                    &mut swr_ctx,
+                                    &out_ch_layout,
+                                    AV_SAMPLE_FMT_FLT,
+                                    target_sample_rate as c_int,
+                                    &in_ch_layout,
+                                    frame_format,
+                                    frame_sample_rate,
+                                    0,
+                                    std::ptr::null_mut(),
+                                );
+
+                                av_channel_layout_uninit(&mut in_ch_layout);
+                                av_channel_layout_uninit(&mut out_ch_layout);
+
+                                if ret < 0 || swr_ctx.is_null() || swr_init(swr_ctx) < 0 {
+                                    if !swr_ctx.is_null() {
+                                        swr_free(&mut swr_ctx);
+                                    }
+                                    running.store(false, Ordering::SeqCst);
+                                    playback_error = Some(format!(
+                                        "Could not initialize audio resampler for decoded sample format {}",
+                                        frame_format
+                                    ));
+                                    break;
+                                }
+                            }
+
                             // Calculate resampled output count
-                            let max_out_samples = ((*audio_frame).nb_samples as i64 * target_sample_rate as i64 / (*audio_frame).sample_rate as i64 + 256) as c_int;
-                            let mut resampled_buffer = vec![0.0f32; (max_out_samples * target_channels as c_int) as usize];
+                            let max_out_samples = ((*audio_frame).nb_samples as i64
+                                * target_sample_rate as i64
+                                / frame_sample_rate as i64
+                                + 256) as c_int;
+                            let mut resampled_buffer =
+                                vec![0.0f32; (max_out_samples * target_channels as c_int) as usize];
 
                             let mut out_ptrs: [*mut u8; 8] = [std::ptr::null_mut(); 8];
                             out_ptrs[0] = resampled_buffer.as_mut_ptr() as *mut u8;
 
-                            let in_ptrs = (*audio_frame).extended_data as *const *const u8;
+                            let in_ptrs = if (*audio_frame).extended_data.is_null() {
+                                (*audio_frame).data.as_ptr() as *const *const u8
+                            } else {
+                                (*audio_frame).extended_data as *const *const u8
+                            };
 
                             let converted = swr_convert(
                                 swr_ctx,
@@ -498,7 +523,8 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
 
                             if converted > 0 {
                                 if let Some(ref mut prod) = audio_producer {
-                                    let sample_count = (converted * target_channels as c_int) as usize;
+                                    let sample_count =
+                                        (converted * target_channels as c_int) as usize;
                                     for i in 0..sample_count {
                                         let sample = resampled_buffer[i];
                                         while running.load(Ordering::SeqCst) {
