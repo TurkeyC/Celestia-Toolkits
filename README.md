@@ -2,6 +2,13 @@
 
 **Turn your terminal into a fast, focused media viewer for images, audio, and videos without leaving the command line.**
 
+(Part of kit* series of graphic terminal apps:
+[kitim](https://github.com/wensheng/kitim)
+[kitmd](https://github.com/wensheng/kitmd)
+[kitpdf](https://github.com/wensheng/kitpdf)
+[kitdraw](https://github.com/wensheng/kitdraw)
+[kitDOOM](https://github.com/wensheng/kitdoom))
+
 (kitim only works in a Kitty-graphics-compatible terminal such as **Kitty**, **Ghostty**, **cmux**, **WezTerm**)
 
 ## Install
