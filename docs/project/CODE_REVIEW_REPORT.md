@@ -1,7 +1,7 @@
 # PixelTerm-C Code Review Report
 
 Date: 2026-05-25
-Scope: current code in `/Users/buding/Code/PixelTerm-C`
+Scope: current code in this repository
 
 ## Summary
 

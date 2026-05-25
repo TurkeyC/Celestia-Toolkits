@@ -305,7 +305,7 @@ static void video_player_set_draining(VideoPlayer *player, gboolean draining) {
     g_mutex_unlock(&player->state_mutex);
 }
 
-static gboolean video_player_has_renderer_locked(VideoPlayer *player) {
+static gboolean video_player_has_renderer(VideoPlayer *player) {
     if (!player) {
         return FALSE;
     }
@@ -1319,7 +1319,7 @@ static void video_player_debug_log_snapshot(VideoPlayer *player,
 }
 
 static void video_player_start_worker(VideoPlayer *player) {
-    if (!player || player->worker_thread || !video_player_has_renderer_locked(player)) {
+    if (!player || player->worker_thread || !video_player_has_renderer(player)) {
         return;
     }
     g_mutex_lock(&player->queue_mutex);
@@ -1557,7 +1557,7 @@ static gpointer video_player_worker_thread(gpointer user_data) {
             continue;
         }
 
-        if (!player->format_context || !player->codec_context || !video_player_has_renderer_locked(player)) {
+        if (!player->format_context || !player->codec_context || !video_player_has_renderer(player)) {
             g_usleep(10000);
             continue;
         }
@@ -1782,7 +1782,7 @@ static gpointer video_player_render_worker_thread(gpointer user_data) {
 }
 
 static gboolean video_player_render_frame(VideoPlayer *player) {
-    if (!player || !video_player_has_renderer_locked(player) || !player->format_context || !player->codec_context) {
+    if (!player || !video_player_has_renderer(player) || !player->format_context || !player->codec_context) {
         return FALSE;
     }
 
@@ -2321,6 +2321,7 @@ gboolean video_player_is_playing(const VideoPlayer *player) {
         return FALSE;
     }
 
+    /* Cast away const only to acquire the internal mutex for a stable read. */
     VideoPlayer *mutable_player = (VideoPlayer*)player;
     g_mutex_lock(&mutable_player->state_mutex);
     gboolean is_playing = mutable_player->is_playing;
@@ -2333,6 +2334,7 @@ gboolean video_player_has_video(const VideoPlayer *player) {
         return FALSE;
     }
 
+    /* Cast away const only to acquire the internal mutex for a stable read. */
     VideoPlayer *mutable_player = (VideoPlayer*)player;
     g_mutex_lock(&mutable_player->state_mutex);
     gboolean has_video = mutable_player->has_video;

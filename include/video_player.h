@@ -126,6 +126,9 @@ ErrorCode video_player_play(VideoPlayer *player);
 ErrorCode video_player_pause(VideoPlayer *player);
 ErrorCode video_player_stop(VideoPlayer *player);
 ErrorCode video_player_seek_relative_ms(VideoPlayer *player, gint64 delta_ms);
+
+/* Thread-safe state accessors. These acquire the player's internal state mutex
+ * and may block; do not call them while already holding that mutex. */
 gboolean video_player_is_playing(const VideoPlayer *player);
 gboolean video_player_has_video(const VideoPlayer *player);
 ErrorCode video_player_update_terminal_size(VideoPlayer *player);
