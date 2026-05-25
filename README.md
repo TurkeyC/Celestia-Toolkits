@@ -11,6 +11,8 @@
 
 (kitim only works in a Kitty-graphics-compatible terminal such as **Kitty**, **Ghostty**, **cmux**, **WezTerm**)
 
+[![demo]](https://github.com/user-attachments/assets/d21faeb7-aead-41c1-b270-0f366005a2d6)
+
 ## Install
 
     cargo install kitim
