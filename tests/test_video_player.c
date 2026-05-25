@@ -103,6 +103,7 @@ typedef struct {
     GMutex mutex;
     GCond cond;
     gboolean started;
+    gboolean finished;
 } ParkedWorkerCall;
 
 static VideoFrame *make_test_frame(gint64 pts_ms);
@@ -296,6 +297,11 @@ static gpointer parked_worker_thread_main(gpointer user_data) {
         g_cond_wait(&call->player->frame_queue_has_space, &call->player->queue_mutex);
     }
     g_mutex_unlock(&call->player->queue_mutex);
+
+    g_mutex_lock(&call->mutex);
+    call->finished = TRUE;
+    g_cond_broadcast(&call->cond);
+    g_mutex_unlock(&call->mutex);
     return NULL;
 }
 
@@ -306,6 +312,7 @@ static GThread *start_parked_worker_for_test(const gchar *name, ParkedWorkerCall
 
     call->player = player;
     call->started = FALSE;
+    call->finished = FALSE;
     g_mutex_init(&call->mutex);
     g_cond_init(&call->cond);
 
@@ -1292,6 +1299,18 @@ static void test_set_renderer_restarts_workers_when_replacing_during_playback(vo
 
     video_player_set_renderer(player, replacement);
 
+    wait_for_flag_or_fail(&decode_call.mutex,
+                          &decode_call.cond,
+                          &decode_call.finished,
+                          "Timed out waiting for replaced decode worker to stop");
+    wait_for_flag_or_fail(&render_a_call.mutex,
+                          &render_a_call.cond,
+                          &render_a_call.finished,
+                          "Timed out waiting for replaced render worker A to stop");
+    wait_for_flag_or_fail(&render_b_call.mutex,
+                          &render_b_call.cond,
+                          &render_b_call.finished,
+                          "Timed out waiting for replaced render worker B to stop");
     g_assert_nonnull(player->worker_thread);
     g_assert_true(player->render_workers_started);
     g_assert_nonnull(player->render_workers[0]);
