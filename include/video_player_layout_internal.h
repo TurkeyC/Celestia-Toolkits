@@ -13,6 +13,9 @@
  * show_stats, color_enhance, render_layout_generation.
  */
 
+/* Queue depth constants */
+#define VIDEO_PLAYER_QUEUE_DEPTH_SMALL_SIZE 8
+
 /* Line cache */
 void video_player_clear_line_cache(VideoPlayer *player);
 

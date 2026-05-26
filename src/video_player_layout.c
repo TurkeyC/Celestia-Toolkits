@@ -72,8 +72,7 @@ enum {
     VIDEO_PLAYER_QUEUE_DEPTH_MEDIUM_AREA = 1500,
     VIDEO_PLAYER_QUEUE_DEPTH_LARGE_AREA = 3000,
     VIDEO_PLAYER_QUEUE_DEPTH_LARGE_SIZE = 4,
-    VIDEO_PLAYER_QUEUE_DEPTH_MEDIUM_SIZE = 6,
-    VIDEO_PLAYER_QUEUE_DEPTH_SMALL_SIZE = 8
+    VIDEO_PLAYER_QUEUE_DEPTH_MEDIUM_SIZE = 6
 };
 
 void video_player_update_queue_depth(VideoPlayer *player, gint rendered_w, gint rendered_h) {

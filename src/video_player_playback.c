@@ -6,10 +6,6 @@ enum {
     VIDEO_PLAYER_MAX_SILENCE_US = 1000000
 };
 
-/* Layout structure of an enqueued rendered frame — kept in sync with the
- * RenderedFrame typedef in video_player.h. We only ever read .pts_ms here. */
-typedef RenderedFrame VideoFrame;
-
 /* ───── Playback generation ───── */
 
 guint video_player_generation_get(VideoPlayer *player) {
@@ -150,7 +146,10 @@ gboolean video_player_should_drop_late_frame(VideoPlayer *player, gint64 pts_ms)
     if (!player) {
         return FALSE;
     }
-    if (player->rewind_needs_resync) {
+    g_mutex_lock(&player->state_mutex);
+    gboolean rewind_needs_resync = player->rewind_needs_resync;
+    g_mutex_unlock(&player->state_mutex);
+    if (rewind_needs_resync) {
         return FALSE;
     }
 

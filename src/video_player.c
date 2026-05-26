@@ -23,14 +23,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef RenderedFrame VideoFrame;
-
 static gboolean video_player_render_frame(VideoPlayer *player);
 static gint video_player_live_instances = 0;
-
-enum {
-    VIDEO_PLAYER_QUEUE_DEPTH_SMALL_SIZE = 8
-};
 
 static gboolean video_player_should_reject_rendered_frame_locked(VideoPlayer *player,
                                                                  VideoFrame *frame,
@@ -2066,6 +2060,7 @@ void video_player_destroy(VideoPlayer *player) {
     }
 
     video_player_stop(player);
+    video_player_clear_line_cache(player);
     video_player_clear_decode(player);
 
     g_free(player->filepath);
