@@ -2,14 +2,20 @@
 
 **Turn your terminal into a fast, focused media viewer for images, audio, and videos without leaving the command line.**
 
-(Part of kit* series of graphic terminal apps:
-[kitim](https://github.com/wensheng/kitim)
-[kitmd](https://github.com/wensheng/kitmd)
-[kitpdf](https://github.com/wensheng/kitpdf)
-[kitdraw](https://github.com/wensheng/kitdraw)
-[kitDOOM](https://github.com/wensheng/kitdoom))
+(Part of kit* series of graphic terminal apps:                                                                                                                                                                                           
+[kitim](https://github.com/wensheng/kitim)                                                                                                                                                                                               
+[kitmd](https://github.com/wensheng/kitmd)                                                                                                                                                                                               
+[kitpdf](https://github.com/wensheng/kitpdf)                                                                                                                                                                                             
+[kitdraw](https://github.com/wensheng/kitdraw)                                                                                                                                                                                           
+[kitDOOM](https://github.com/wensheng/kitdoom)) 
 
-(kitim only works in a Kitty-graphics-compatible terminal such as **Kitty**, **Ghostty**, **cmux**, **WezTerm**)
+***kitim runs on terminals that supports the Kitty graphics protocol:
+[**Ghostty**](https://ghostty.org/),
+[**Kitty**](https://sw.kovidgoyal.net/kitty/),
+[**WezTerm**](https://wezterm.net/),
+[**cmux**](https://github.com/manaflow-ai/cmux),
+[**Warp**](https://warp.dev/),
+[**iTerm2**](https://www.iterm2.com/) (see notes below for iTerm2).***
 
 [![demo]](https://github.com/user-attachments/assets/d21faeb7-aead-41c1-b270-0f366005a2d6)
 
@@ -48,9 +54,13 @@
 ```bash
 kitim screenshot.png
 kitim song.mp3
-kitim -z 0.7 clip.webm
+kitim -z 1.5 clip.webm
 kitim --loop --frame-rate 24 animation.gif
 ```
+
+`-z`/`--zoom` is a multiplier on the original media size. Media displays at
+original size by default, and shrinks to fit the terminal with a small margin
+when it would otherwise exceed the available screen area.
 
 ---
 
@@ -63,3 +73,13 @@ file path -> image/GIF decoder or FFmpeg -> RGBA frames -> Kitty graphics chunks
 ```
 
 `kitim` keeps the rendering path direct: decode into RGBA, resize to terminal cell geometry, chunk through the Kitty protocol, and use audio timing as the playback clock when a video has sound.
+
+## Notes
+
+For iTerm2, set:
+
+```bash
+export TERMINAL_KITTEN_GRAPHICS=1
+```
+
+in your `.zshrc` or `.bashrc`.

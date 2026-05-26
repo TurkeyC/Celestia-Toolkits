@@ -11,8 +11,8 @@ pub struct Config {
     #[arg(required = true)]
     pub files: Vec<String>,
 
-    /// Zoom level multiplier to resize the output (default: 0.4)
-    #[arg(short = 'z', long = "zoom", default_value_t = 0.4)]
+    /// Zoom multiplier applied to the original media size
+    #[arg(short = 'z', long = "zoom", default_value_t = 1.0)]
     pub zoom: f32,
 
     /// Optional frame rate override for video playback (fps)

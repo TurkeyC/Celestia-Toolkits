@@ -60,12 +60,31 @@ pub fn write_rgba_frame(
     rows: u32,
     prevent_cursor_move: bool,
 ) -> io::Result<()> {
+    let mut stdout = io::stdout().lock();
+    write_rgba_frame_to(
+        &mut stdout,
+        pixels,
+        width_px,
+        height_px,
+        cols,
+        rows,
+        prevent_cursor_move,
+    )
+}
+
+pub fn write_rgba_frame_to<W: Write>(
+    writer: &mut W,
+    pixels: &[u8],
+    width_px: u32,
+    height_px: u32,
+    cols: u32,
+    rows: u32,
+    prevent_cursor_move: bool,
+) -> io::Result<()> {
     let base64_str = BASE64_STANDARD.encode(pixels);
     let bytes = base64_str.as_bytes();
     let chunk_size = 4096;
     let mut offset = 0;
-
-    let mut stdout = io::stdout().lock();
 
     while offset < bytes.len() {
         let is_last = offset + chunk_size >= bytes.len();
@@ -90,10 +109,10 @@ pub fn write_rgba_frame(
         packet.write_all(chunk)?;
         packet.write_all(b"\x1b\\")?;
 
-        write_all_robust(&mut stdout, &packet)?;
+        write_all_robust(&mut *writer, &packet)?;
         offset += chunk_size;
     }
 
-    flush_robust(&mut stdout)?;
+    flush_robust(&mut *writer)?;
     Ok(())
 }
