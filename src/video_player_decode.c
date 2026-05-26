@@ -41,6 +41,10 @@ struct SwsContext *video_player_create_sws_context(const AVCodecContext *codec_c
         return NULL;
     }
 
+    if (!video_player_dimensions_within_limits(width, height)) {
+        return NULL;
+    }
+
     enum AVPixelFormat src_pix_fmt = codec_context->pix_fmt;
     gboolean src_range_extended = FALSE;
     switch (src_pix_fmt) {
