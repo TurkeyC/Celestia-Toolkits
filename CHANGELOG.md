@@ -1,5 +1,14 @@
 # Changelog
 
+- v1.7.28: VideoPlayer module refactor, race-condition hardening, and preloader thread safety.
+    - **VideoPlayer Module Split**: Extract the monolithic `video_player.c` (2606→2097 lines) into three focused internal modules: `video_player_decode` (FFmpeg init, sws context, RGBA buffer, decode teardown), `video_player_layout` (line cache, I/O timing, queue depth, pixel-mode labels), and `video_player_playback` (generation counter, frame delay, EOF flags, clock/PTS helpers, late-frame drop logic). Each module has its own internal header with clear ownership boundaries.
+    - **Race-Condition Hardening (PR #22)**: Fix renderer replacement to stop old workers before starting new ones. Harden book table-of-contents and media-buffer concurrent access. Add `state_mutex` protection for `rewind_needs_resync` reads in late-frame drop decisions.
+    - **Post-Refactor Fixes**: Resolve circular dependency by moving `get_slow_level`/`calc_late_window_ms` from layout to playback. Fix memory leak: clear line cache before freeing decode resources in `video_player_destroy`. Centralize `typedef RenderedFrame VideoFrame` in `video_player.h` to eliminate 4 local copies. Add `codec_context` NULL check and dimension validation to `video_player_create_sws_context`.
+    - **Preloader Thread Safety**: Snapshot all mutable configuration fields under mutex before spawning the worker thread. Extract `preloader_clear_queue_locked` and `preloader_cache_cleanup_locked` to enforce consistent locking. Wrap `preloader_initialize` and `preloader_add_tasks_for_directory` dimension normalization with proper mutex coverage.
+    - **Book Safety**: Extract `book_clamped_target_pixels` to cap decoded book page dimensions at 4096px, preventing oversized decode buffers.
+    - **Testing**: 273/273 C TAP tests pass (up from 272). New tests for renderer replacement worker lifecycle, preloader cache semantics, and post-EOF seek preview safety. All new modules linked into the main test binary.
+    - **Code Review Documentation**: Add `docs/project/CODE_REVIEW_REPORT.md` (145 lines) documenting race-condition findings and remediation.
+
 - v1.7.27: Installer integrity, rendering hardening, and vivid color controls.
     - **Color Controls**: Add an explicit `--color-enhance off|vivid` mode so users can opt into stronger image saturation while keeping default rendering unchanged.
     - **Installer Integrity**: Verify release binaries against published `SHA256SUMS`, support pinned `--version <tag>` installs, and keep `--version latest` on the latest-release download path.
