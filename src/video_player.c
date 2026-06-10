@@ -140,6 +140,8 @@ static void video_player_schedule_tick(VideoPlayer *player) {
     g_mutex_lock(&player->state_mutex);
     gboolean is_playing = player->is_playing;
     g_mutex_unlock(&player->state_mutex);
+    /* video_player_has_renderer() takes render_mutex; keep renderer reads
+     * centralized so detach cannot race with tick scheduling. */
     if (!is_playing || !video_player_has_renderer(player)) {
         return;
     }
@@ -676,7 +678,8 @@ void video_player_set_renderer(VideoPlayer *player, ImageRenderer *renderer) {
     g_mutex_lock(&player->render_mutex);
     gboolean replacing_renderer = player->renderer && player->renderer != renderer;
     g_mutex_unlock(&player->render_mutex);
-    /* Replacing with NULL detaches the renderer, so playback must stop now.
+    /* Replacing with NULL detaches the renderer, so playback must stop now;
+     * a later reattach is inert until callers explicitly start playback again.
      * Replacing with a renderer pauses workers during the swap and resumes. */
     gboolean was_playing = replacing_renderer && video_player_is_playing(player);
     guint timer_id = 0;
