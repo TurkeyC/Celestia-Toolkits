@@ -150,12 +150,20 @@ static void video_player_schedule_tick(VideoPlayer *player) {
     }
 
     g_mutex_lock(&player->state_mutex);
+    if (!player->is_playing || player->eof_ended) {
+        g_mutex_unlock(&player->state_mutex);
+        return;
+    }
     guint old_timer_id = player->timer_id;
     player->timer_id = g_timeout_add(delay, video_player_tick, player);
     g_mutex_unlock(&player->state_mutex);
     if (old_timer_id != 0) {
         g_source_remove(old_timer_id);
     }
+}
+
+void video_player_schedule_tick_for_test(VideoPlayer *player) {
+    video_player_schedule_tick(player);
 }
 
 void decoded_frame_destroy(DecodedFrame *frame) {
@@ -667,9 +675,21 @@ void video_player_set_renderer(VideoPlayer *player, ImageRenderer *renderer) {
     g_mutex_lock(&player->render_mutex);
     gboolean replacing_renderer = player->renderer && player->renderer != renderer;
     g_mutex_unlock(&player->render_mutex);
-    gboolean was_playing = replacing_renderer && renderer && video_player_is_playing(player);
+    gboolean was_playing = replacing_renderer && video_player_is_playing(player);
+    guint timer_id = 0;
     if (replacing_renderer) {
+        if (!renderer && was_playing) {
+            video_player_generation_bump(player);
+            g_mutex_lock(&player->state_mutex);
+            player->is_playing = FALSE;
+            timer_id = player->timer_id;
+            player->timer_id = 0;
+            g_mutex_unlock(&player->state_mutex);
+        }
         video_player_stop_worker(player);
+    }
+    if (timer_id != 0) {
+        g_source_remove(timer_id);
     }
 
     g_mutex_lock(&player->render_mutex);
@@ -680,7 +700,7 @@ void video_player_set_renderer(VideoPlayer *player, ImageRenderer *renderer) {
     player->owns_renderer = FALSE;
     g_mutex_unlock(&player->render_mutex);
 
-    if (was_playing) {
+    if (renderer && was_playing) {
         video_player_resume_playback_loop(player);
     }
 }
