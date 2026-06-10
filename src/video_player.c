@@ -29,6 +29,7 @@ static gint video_player_live_instances = 0;
 static gboolean video_player_should_reject_rendered_frame_locked(VideoPlayer *player,
                                                                  VideoFrame *frame,
                                                                  gboolean check_stale_pts);
+static gboolean video_player_has_renderer(VideoPlayer *player);
 static ErrorCode video_player_seek_to_ms(VideoPlayer *player, gint64 current_ms, gint64 target_ms);
 static gboolean video_player_has_tail_work_locked(VideoPlayer *player);
 static gboolean video_player_finalize_pending_eof_if_drained(VideoPlayer *player);
@@ -139,7 +140,9 @@ static void video_player_schedule_tick(VideoPlayer *player) {
     g_mutex_lock(&player->state_mutex);
     gboolean is_playing = player->is_playing;
     g_mutex_unlock(&player->state_mutex);
-    if (!is_playing) {
+    /* video_player_has_renderer() takes render_mutex; keep renderer reads
+     * centralized so detach cannot race with tick scheduling. */
+    if (!is_playing || !video_player_has_renderer(player)) {
         return;
     }
 
@@ -150,12 +153,20 @@ static void video_player_schedule_tick(VideoPlayer *player) {
     }
 
     g_mutex_lock(&player->state_mutex);
+    if (!player->is_playing || player->eof_ended) {
+        g_mutex_unlock(&player->state_mutex);
+        return;
+    }
     guint old_timer_id = player->timer_id;
     player->timer_id = g_timeout_add(delay, video_player_tick, player);
     g_mutex_unlock(&player->state_mutex);
     if (old_timer_id != 0) {
         g_source_remove(old_timer_id);
     }
+}
+
+G_GNUC_INTERNAL void video_player_schedule_tick_for_test(VideoPlayer *player) {
+    video_player_schedule_tick(player);
 }
 
 void decoded_frame_destroy(DecodedFrame *frame) {
@@ -667,9 +678,24 @@ void video_player_set_renderer(VideoPlayer *player, ImageRenderer *renderer) {
     g_mutex_lock(&player->render_mutex);
     gboolean replacing_renderer = player->renderer && player->renderer != renderer;
     g_mutex_unlock(&player->render_mutex);
-    gboolean was_playing = replacing_renderer && renderer && video_player_is_playing(player);
+    /* Replacing with NULL detaches the renderer, so playback must stop now;
+     * a later reattach is inert until callers explicitly start playback again.
+     * Replacing with a renderer pauses workers during the swap and resumes. */
+    gboolean was_playing = replacing_renderer && video_player_is_playing(player);
+    guint timer_id = 0;
     if (replacing_renderer) {
+        if (!renderer && was_playing) {
+            video_player_generation_bump(player);
+            g_mutex_lock(&player->state_mutex);
+            player->is_playing = FALSE;
+            timer_id = player->timer_id;
+            player->timer_id = 0;
+            g_mutex_unlock(&player->state_mutex);
+        }
         video_player_stop_worker(player);
+    }
+    if (timer_id != 0) {
+        g_source_remove(timer_id);
     }
 
     g_mutex_lock(&player->render_mutex);
@@ -680,7 +706,7 @@ void video_player_set_renderer(VideoPlayer *player, ImageRenderer *renderer) {
     player->owns_renderer = FALSE;
     g_mutex_unlock(&player->render_mutex);
 
-    if (was_playing) {
+    if (renderer && was_playing) {
         video_player_resume_playback_loop(player);
     }
 }
