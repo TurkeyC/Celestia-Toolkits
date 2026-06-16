@@ -243,14 +243,14 @@ pub fn init(allocator: std.mem.Allocator) Self {
     var path: []u8 = "";
     const xdg_config_home = std.process.getEnvVarOwned(allocator, "XDG_CONFIG_HOME") catch null;
     if (xdg_config_home) |x| {
-        path = std.fmt.allocPrint(allocator, "{s}/fancy-cat/config.json", .{x}) catch return self;
+        path = std.fmt.allocPrint(allocator, "{s}/celestia-pdf-reader/config.json", .{x}) catch return self;
         allocator.free(x);
-    } else path = std.fmt.allocPrint(allocator, "{s}/.config/fancy-cat/config.json", .{home}) catch return self;
+    } else path = std.fmt.allocPrint(allocator, "{s}/.config/celestia-pdf-reader/config.json", .{home}) catch return self;
     defer allocator.free(path);
 
     var content = std.fs.cwd().readFileAlloc(allocator, path, 1024 * 1024) catch null;
     if (content == null) {
-        const legacy_path = std.fmt.allocPrint(allocator, "{s}/.fancy-cat", .{home}) catch return self;
+        const legacy_path = std.fmt.allocPrint(allocator, "{s}/.celestia-pdf-reader", .{home}) catch return self;
         defer allocator.free(legacy_path);
 
         content = std.fs.cwd().readFileAlloc(allocator, legacy_path, 1024 * 1024) catch null;

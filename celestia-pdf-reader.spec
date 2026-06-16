@@ -9,7 +9,7 @@ License:        AGPL-3.0
 URL:            https://github.com/TurkeyC/Celestia-Toolkits/tree/pdf-reader
 
 # 注意：这里的文件名必须是你即将生成的 tarball 的名字
-# 假设我们生成的包叫 fancy-cat-0.6.0-offline.tar.gz
+# 假设我们生成的包叫 celestia-pdf-reader-0.6.2-offline.tar.gz
 Source0:        %{name}-%{version}-offline.tar.gz
 
 BuildArch:      x86_64
@@ -23,7 +23,7 @@ BuildRequires: clang-libs
 BuildRequires: patchelf 
 
 %description
-fancy-cat is a PDF viewer for terminal emulators that support the Kitty graphics protocol.
+celestia-pdf-reader is a PDF viewer for terminal emulators that support the Kitty graphics protocol.
 This package includes the specific Zig compiler (0.15.2) and mupdf sources, 
 requiring NO network access during the build process.
 
@@ -46,18 +46,18 @@ $ZIG_BIN build --release=small -Dcpu="baseline"
 
 %install
 mkdir -p %{buildroot}/%{_bindir}
-cp zig-out/bin/fancy-cat %{buildroot}/%{_bindir}/
+cp zig-out/bin/celestia-pdf-reader %{buildroot}/%{_bindir}/
 
 # 清除 RPATH
-patchelf --remove-rpath %{buildroot}/%{_bindir}/fancy-cat
+patchelf --remove-rpath %{buildroot}/%{_bindir}/celestia-pdf-reader
 
 # 可选：验证
 echo "Build-ID injected:"
-readelf -n %{buildroot}/%{_bindir}/fancy-cat | grep "Build ID" || echo "Warning: Build ID not found"
+readelf -n %{buildroot}/%{_bindir}/celestia-pdf-reader | grep "Build ID" || echo "Warning: Build ID not found"
 
 
 %files
-%{_bindir}/fancy-cat
+%{_bindir}/celestia-pdf-reader
 
 %changelog
 * Mon Jun 15 2026 CaoTurkey <cao-turkey@outlook.com> - 0.6.2-1

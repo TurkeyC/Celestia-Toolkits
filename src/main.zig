@@ -5,7 +5,7 @@ const Context = @import("Context.zig").Context;
 // For now metadata is only used in main.zig, but can move it to types.zig if needed eleswhere
 // This wont be necessary once https://github.com/ziglang/zig/pull/22907 is merged
 
-const PackageName = enum { fancy_cat };
+const PackageName = enum { celestia_pdf_reader };
 
 const DependencyType = struct {
     url: []const u8,
@@ -42,7 +42,7 @@ pub fn main() !void {
     const stderr = &stderr_writer.interface;
 
     if (args.len == 2 and (std.mem.eql(u8, args[1], "--version") or std.mem.eql(u8, args[1], "-v"))) {
-        try stdout.print("fancy-cat {s}\n", .{metadata.version});
+        try stdout.print("celestia-pdf-reader {s}\n", .{metadata.version});
         try stdout.flush();
         return;
     }
@@ -76,17 +76,17 @@ pub fn main() !void {
 
 fn printUsage(writer: anytype) !void {
     try writer.writeAll(
-        \\Usage: fancy-cat <file> [page]
-        \\Try 'fancy-cat --help' for more information.
+        \\Usage: celestia-pdf-reader <file> [page]
+        \\Try 'celestia-pdf-reader --help' for more information.
         \\
     );
 }
 
 fn printHelp(writer: anytype) !void {
     try writer.writeAll(
-        \\fancy-cat - PDF viewer for terminals using the Kitty image protocol
+        \\celestia-pdf-reader - PDF viewer for terminals using the Kitty image protocol
         \\
-        \\Usage: fancy-cat <file> [page]
+        \\Usage: celestia-pdf-reader <file> [page]
         \\
         \\Arguments:
         \\  <file>      Path to a PDF file
@@ -131,12 +131,12 @@ fn printHelp(writer: anytype) !void {
         \\  :y-<number>   Scroll up
         \\
         \\Configuration:
-        \\  $XDG_CONFIG_HOME/fancy-cat/config.json
-        \\  $HOME/.config/fancy-cat/config.json
+        \\  $XDG_CONFIG_HOME/celestia-pdf-reader/config.json
+        \\  $HOME/.config/celestia-pdf-reader/config.json
         \\
         \\Examples:
-        \\  fancy-cat document.pdf
-        \\  fancy-cat document.pdf 42
+        \\  celestia-pdf-reader document.pdf
+        \\  celestia-pdf-reader document.pdf 42
         \\
     );
 }

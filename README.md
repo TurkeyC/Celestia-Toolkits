@@ -27,7 +27,7 @@ Documentation on the available commands can be found [here](./docs/commands.md).
 
 ### Configuration
 
-Celestia-PDF-Reader can be configured through a JSON configuration file located in one of several locations (primary `$XDG_CONFIG_HOME/fancy-cat/config.json`, fallback `$HOME/.config/fancy-cat/config.json`, legacy `$HOME/.fancy-cat`). An empty configuration file is automatically created in the primary or fallback location on the first run.
+Celestia-PDF-Reader can be configured through a JSON configuration file located in one of several locations (primary `$XDG_CONFIG_HOME/celestia-pdf-reader/config.json`, fallback `$HOME/.config/celestia-pdf-reader/config.json`, legacy `$HOME/.celestia-pdf-reader`). An empty configuration file is automatically created in the primary or fallback location on the first run.
 
 An example `config.json` and documentation can be found [here](./docs/config.md).
 
@@ -64,10 +64,10 @@ zig build --release=small
 ```sh
 # Add to your PATH
 # Linux
-mv zig-out/bin/fancy-cat ~/.local/bin/
+mv zig-out/bin/celestia-pdf-reader ~/.local/bin/
 
 # macOS
-mv zig-out/bin/fancy-cat /usr/local/bin/
+mv zig-out/bin/celestia-pdf-reader /usr/local/bin/
 ```
 
 ### Run

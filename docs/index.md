@@ -1,4 +1,4 @@
-# 📑 fancy-cat
+# celestia-pdf-reader
 
 PDF viewer for terminals using the Kitty image protocol.
 

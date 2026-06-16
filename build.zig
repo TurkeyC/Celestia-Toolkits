@@ -81,7 +81,7 @@ pub fn build(b: *std.Build) void {
     const mupdf_build_step = b.addSystemCommand(make_args.items);
 
     const exe = b.addExecutable(.{
-        .name = "fancy-cat",
+        .name = "celestia-pdf-reader",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,

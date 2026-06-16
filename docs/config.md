@@ -1,30 +1,30 @@
 # Configuration
 
-On startup, fancy-cat looks for a configuration file in the following locations:
+On startup, celestia-pdf-reader looks for a configuration file in the following locations:
 
 **Primary**
 
 ```
-$XDG_CONFIG_HOME/fancy-cat/config.json
+$XDG_CONFIG_HOME/celestia-pdf-reader/config.json
 ```
 
 **Fallback**
 
 ```
-$HOME/.config/fancy-cat/config.json
+$HOME/.config/celestia-pdf-reader/config.json
 ```
 
 **Legacy**
 
 ```
-$HOME/.fancy-cat
+$HOME/.celestia-pdf-reader
 ```
 
-If no configuration file is found in any of these locations, fancy-cat creates an empty configuration file in the primary or fallback location.
+If no configuration file is found in any of these locations, celestia-pdf-reader creates an empty configuration file in the primary or fallback location.
 
 ## Defaults
 
-Because fancy-cat provides sensible defaults, you only need to specify the options you wish to override. Below is an example configuration file that replicates the default settings. You can use this example as a starting point for your customizations:
+Because celestia-pdf-reader provides sensible defaults, you only need to specify the options you wish to override. Below is an example configuration file that replicates the default settings. You can use this example as a starting point for your customizations:
 
 ```json
 {
@@ -245,27 +245,27 @@ The following color formats are supported:
 
 ### History
 
-To ensure persistence across sessions, fancy-cat saves its command history in one of the following locations:
+To ensure persistence across sessions, celestia-pdf-reader saves its command history in one of the following locations:
 
 **Primary**
 
 ```
-$XDG_STATE_HOME/fancy-cat/history
+$XDG_STATE_HOME/celestia-pdf-reader/history
 ```
 
 **Fallback**
 
 ```
-$HOME/.local/state/fancy-cat/history
+$HOME/.local/state/celestia-pdf-reader/history
 ```
 
 **Legacy**
 
 ```
-$HOME/.fancy-cat_history
+$HOME/.celestia-pdf-reader_history
 ```
 >[!NOTE]
->The legacy location is only used if the [configuration file](#configuration) itself is located at `$HOME/.fancy-cat`.
+>The legacy location is only used if the [configuration file](#configuration) itself is located at `$HOME/.celestia-pdf-reader`.
 
 ---
 

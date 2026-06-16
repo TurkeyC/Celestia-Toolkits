@@ -25,10 +25,10 @@ pub fn init(allocator: std.mem.Allocator, config: *Config) Self {
     if (!config.legacy_path) {
         const xdg_state_home = std.process.getEnvVarOwned(allocator, "XDG_STATE_HOME") catch null;
         if (xdg_state_home) |x| {
-            self.path = std.fmt.allocPrint(allocator, "{s}/fancy-cat/history", .{x}) catch return self;
+            self.path = std.fmt.allocPrint(allocator, "{s}/celestia-pdf-reader/history", .{x}) catch return self;
             allocator.free(x);
-        } else self.path = std.fmt.allocPrint(allocator, "{s}/.local/state/fancy-cat/history", .{home}) catch return self;
-    } else self.path = std.fmt.allocPrint(allocator, "{s}/.fancy-cat_history", .{home}) catch return self;
+        } else self.path = std.fmt.allocPrint(allocator, "{s}/.local/state/celestia-pdf-reader/history", .{home}) catch return self;
+    } else self.path = std.fmt.allocPrint(allocator, "{s}/.celestia-pdf-reader_history", .{home}) catch return self;
 
     const content = std.fs.cwd().readFileAlloc(allocator, self.path, 1024 * 1024) catch null;
     if (content == null) return self;
