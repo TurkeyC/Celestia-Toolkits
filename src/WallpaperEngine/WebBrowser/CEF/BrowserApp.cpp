@@ -36,6 +36,12 @@ void BrowserApp::OnBeforeCommandLineProcessing (const CefString& process_type, C
     command_line->AppendSwitch ("--disable-breakpad");
     command_line->AppendSwitch ("--disable-field-trial-config");
     command_line->AppendSwitch ("--no-experiments");
+    // Wayland + NVIDIA 下 GPU 进程默认走 ANGLE+Vulkan 会失败，改用 native EGL
+    command_line->AppendSwitchWithValue ("--use-gl", "angle");
+    command_line->AppendSwitchWithValue ("--use-angle", "gl-egl");
+    command_line->AppendSwitch ("--disable-gpu-compositing");
+    command_line->AppendSwitch ("--disable-accelerated-2d-canvas");
+    command_line->AppendSwitch ("--disable-accelerated-video-decode");
     // TODO: ACTIVATE THIS IF WE EVER SUPPORT MACOS OFFICIALLY
     /*
 if (process_type.empty()) {
