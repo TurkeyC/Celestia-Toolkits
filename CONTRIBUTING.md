@@ -21,5 +21,5 @@ git push -u origin project
 # 添加远程仓库
 git remote add celes https://github.com/TurkeyC/Celestia-Toolkits.git
 # 直接推，把当前项目的mian作为远程项目的project
-git push -u celes project
+git push -u celes main:project
 ```
