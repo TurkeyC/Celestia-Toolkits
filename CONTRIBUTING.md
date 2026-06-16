@@ -20,7 +20,7 @@ git push -u origin project
 # 先在别人的项目分支中进行正常开发，然后基于现在这个分支创建项目分支
 git switch -c project
 # 添加远程仓库
-git remote add origin https://github.com/TurkeyC/Celestia-Toolkits.git
+git remote add celes https://github.com/TurkeyC/Celestia-Toolkits.git
 # 直接推
-git push -u origin project
+git push -u celes project
 ```
