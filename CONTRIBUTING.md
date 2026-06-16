@@ -17,10 +17,9 @@ git push -u origin project
 ## 增量开发(基于别人的项目进行的二次开发)
 
 ```zsh
-# 先在别人的项目分支中进行正常开发，然后基于现在这个分支创建项目分支
-git switch -c project
+# 先在别人的项目分支中进行正常开发
 # 添加远程仓库
 git remote add celes https://github.com/TurkeyC/Celestia-Toolkits.git
-# 直接推
+# 直接推，把当前项目的mian作为远程项目的project
 git push -u celes project
 ```
