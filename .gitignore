@@ -1,0 +1,7 @@
+.zig-cache/
+zig-out/
+build-tools/
+deps/
+*.tar.gz
+build.log
+.qoder/
