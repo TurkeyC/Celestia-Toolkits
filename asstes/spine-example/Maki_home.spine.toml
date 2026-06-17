@@ -1,0 +1,24 @@
+skeleton = "Maki_home.json"
+
+[[anim]]
+name = "Start_Idle_01"
+duration = 11.3
+
+[[anim]]
+name = "Idle_01"
+loop_anim = true
+duration = 0
+
+# [[anim]]
+# name = "Talk_01_M"
+# duration = 5.0
+#
+# [[anim]]
+# name = "Dev_Idle_01"
+# loop_anim = true
+# duration = 0
+
+[display]
+offset_x = 0.0
+offset_y = 0.0
+scale = 0.0

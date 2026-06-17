@@ -162,6 +162,10 @@ celestia-wallpaper -o "--playlist=/path/to/playlist.m3u" DP-1
 # 设置图层为 bottom
 celestia-wallpaper -l bottom DP-1 video.mp4
 
+# 播放 Spine 2D 骨架动画壁纸（直接使用json或者skel）
+celestia-wallpaper DP-1 /path/to/model.json
+celestia-wallpaper DP-1 /path/to/model.skel
+
 # 播放 Spine 2D 骨架动画壁纸（TOML 配置）
 celestia-wallpaper DP-1 /path/to/model.spine.toml
 
@@ -170,6 +174,26 @@ celestia-wallpaper DP-1 /path/to/model.spine.lua
 
 # 后台运行（fork 模式）
 celestia-wallpaper -f DP-1 video.mp4
+```
+
+#### 使用项目中的示例文件快速体验
+
+```bash
+# 示例视频
+./target/release/celestia-wallpaper -t video -s eDP-1 -l background -o "no-audio loop" ./asstes/video-example/Wanderer.mp4
+
+# 示例图片
+./target/release/celestia-wallpaper -t picture -s eDP-1 -l background ./asstes/picture-example/nature.png
+
+# 示例spine2D
+# 使用skel
+./target/release/celestia-wallpaper -t spine -s eDP-1 -l background ./asstes/spine-example/Maki_home.skel
+# 使用json
+./target/release/celestia-wallpaper -t spine -s eDP-1 -l background ./asstes/spine-example/Maki_home.json
+# 使用toml
+./target/release/celestia-wallpaper -t spine -s eDP-1 -l background ./asstes/spine-example/Maki_home.spine.toml
+# 使用lua
+./target/release/celestia-wallpaper -t spine -s eDP-1 -l background ./asstes/spine-example/Maki_home.spine.lua
 ```
 
 ### celestia-wallpaper-holder
