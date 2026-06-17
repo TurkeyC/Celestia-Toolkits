@@ -1,8 +1,8 @@
 [package]
-name = "mpvpaper-holder"
+name = "celestia-wallpaper-holder"
 version = "1.8.0"
 edition = "2021"
-description = "Lean placeholder that holds the wallpaper surface while mpvpaper is stopped"
+description = "Lean placeholder that holds the wallpaper surface while celestia-wallpaper is stopped"
 
 [dependencies]
 wayland-client = "0.31"

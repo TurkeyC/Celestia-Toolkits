@@ -1,21 +1,24 @@
-# mpvpaper-rust
+# Celestia-WallPaper
 
-> 用 Rust 完全重写的 [mpvpaper](https://github.com/GhostNaN/mpvpaper) —— 基于 wlroots 的 Wayland 合成器视频壁纸播放器。
+> 基于 wlroots 的 Wayland 合成器视频壁纸播放器 —— 用 Rust 完全重写的 [mpvpaper](https://github.com/GhostNaN/mpvpaper)。
 
-本项目是原版 C 语言 mpvpaper 的 Rust 重写，包含两个独立二进制文件：`mpvpaper`（主程序）和 `mpvpaper-holder`（占位程序）。功能与原版完全对齐，代码更加安全、可维护。
+本项目是原版 C 语言 mpvpaper 的 Rust 重写（更名为 **Celestia-WallPaper**），包含两个独立二进制文件：`celestia-wallpaper`（主程序）和 `celestia-wallpaper-holder`（占位程序）。功能与原版完全对齐，代码更加安全、可维护。
+
+> **关于重命名**：原项目名 `mpvpaper` 继续在代码内部（如 crate 间的路径引用）使用，但对外发布名已更名为 Celestia-WallPaper。
+> 如果你之前使用原版 C mpvpaper，本程序提供完全相同的命令行接口，二进制名改为 `celestia-wallpaper` 即可。
 
 ---
 
 ## 目录
 
 - [项目概述](#项目概述)
-- [与 C 原版的对比](#与-c-原版的对比)
+- [与原版 C mpvpaper 的对比](#与原版-c-mpvpaper-的对比)
 - [系统要求](#系统要求)
 - [构建依赖](#构建依赖)
 - [编译与安装](#编译与安装)
 - [使用方法](#使用方法)
-  - [mpvpaper](#mpvpaper)
-  - [mpvpaper-holder](#mpvpaper-holder)
+  - [celestia-wallpaper](#celestia-wallpaper)
+  - [celestia-wallpaper-holder](#celestia-wallpaper-holder)
 - [命令行参数详解](#命令行参数详解)
 - [配置文件](#配置文件)
   - [pauselist（自动暂停列表）](#pauselist自动暂停列表)
@@ -37,7 +40,7 @@
 
 ## 项目概述
 
-mpvpaper 是一个在 Wayland 桌面上播放视频壁纸的工具。它通过 `wlr-layer-shell` 协议将 mpv 的渲染输出直接绘制到桌面背景层，支持：
+Celestia-WallPaper 是一个在 Wayland 桌面上播放视频壁纸的工具。它通过 `wlr-layer-shell` 协议将 mpv 的渲染输出直接绘制到桌面背景层，支持：
 
 - 播放本地视频或网络流
 - 多显示器支持
@@ -48,9 +51,9 @@ mpvpaper 是一个在 Wayland 桌面上播放视频壁纸的工具。它通过 `
 
 ---
 
-## 与 C 原版的对比
+## 与原版 C mpvpaper 的对比
 
-| 特性 | C 原版 | Rust 重写 |
+| 特性 | C 原版 | Rust 重写（Celestia-WallPaper） |
 |------|--------|-----------|
 | 语言 | C | Rust |
 | Wayland 绑定 | 手写 C 绑定 | `wayland-client` crate（类型安全） |
@@ -106,55 +109,68 @@ cargo build
 cargo build --release
 
 # 安装到系统（可选）
-sudo cp target/release/mpvpaper /usr/local/bin/
-sudo cp target/release/mpvpaper-holder /usr/local/bin/
+sudo cp target/release/celestia-wallpaper /usr/local/bin/
+sudo cp target/release/celestia-wallpaper-holder /usr/local/bin/
 ```
 
 编译产物位于：
-- `target/release/mpvpaper` — 主程序
-- `target/release/mpvpaper-holder` — 占位程序
+- `target/release/celestia-wallpaper` — 主程序
+- `target/release/celestia-wallpaper-holder` — 占位程序
+
+### RPM 构建（Fedora）
+
+```bash
+# 生成 tarball
+git archive --prefix=celestia-wallpaper-1.8.0/ -o ~/rpmbuild/SOURCES/celestia-wallpaper-1.8.0.tar.gz HEAD
+
+# 构建 SRPM
+rpmbuild -bs celestia-wallpaper.spec
+
+# 用 mock 构建 RPM
+mock -r fedora-43-x86_64 --rebuild ~/rpmbuild/SRPMS/celestia-wallpaper-1.8.0-1.fc43.src.rpm
+```
 
 ---
 
 ## 使用方法
 
-### mpvpaper
+### celestia-wallpaper
 
 基本用法：
 
 ```bash
 # 在指定显示器上播放视频
-mpvpaper <OUTPUT> <视频路径或URL>
+celestia-wallpaper <OUTPUT> <视频路径或URL>
 
 # 示例：在 DP-1 上播放本地视频
-mpvpaper DP-1 /path/to/video.mp4
+celestia-wallpaper DP-1 /path/to/video.mp4
 
 # 示例：在 HDMI-A-1 上播放网络视频
-mpvpaper HDMI-A-1 https://example.com/video.mp4
+celestia-wallpaper HDMI-A-1 https://example.com/video.mp4
 
 # 查看所有可用显示器
-mpvpaper -d
+celestia-wallpaper -d
 
 # 启用详细日志
-mpvpaper -vv DP-1 video.mp4
+celestia-wallpaper -vv DP-1 video.mp4
 
 # 使用播放列表
-mpvpaper -o "--playlist=/path/to/playlist.m3u" DP-1
+celestia-wallpaper -o "--playlist=/path/to/playlist.m3u" DP-1
 
 # 设置图层为 bottom
-mpvpaper -l bottom DP-1 video.mp4
+celestia-wallpaper -l bottom DP-1 video.mp4
 
 # 后台运行（fork 模式）
-mpvpaper -f DP-1 video.mp4
+celestia-wallpaper -f DP-1 video.mp4
 ```
 
-### mpvpaper-holder
+### celestia-wallpaper-holder
 
-`mpvpaper-holder` 通常不需要手动运行。它由 `mpvpaper` 在自动停止模式下自动启动，用于在 mpvpaper 暂停时"占住"壁纸表面，防止合成器回收该图层。
+`celestia-wallpaper-holder` 通常不需要手动运行。它由 `celestia-wallpaper` 在自动停止模式下自动启动，用于在壁纸暂停时"占住"壁纸表面，防止合成器回收该图层。
 
 ```bash
 # 手动运行（调试用）
-mpvpaper-holder <OUTPUT>
+celestia-wallpaper-holder <OUTPUT>
 ```
 
 ---
@@ -178,26 +194,26 @@ mpvpaper-holder <OUTPUT>
 
 ```bash
 # 设置循环播放和静音
-mpvpaper -o "--loop --mute=yes" DP-1 video.mp4
+celestia-wallpaper -o "--loop --mute=yes" DP-1 video.mp4
 
 # 使用播放列表文件
-mpvpaper -o "--playlist=~/videos/list.m3u" DP-1
+celestia-wallpaper -o "--playlist=~/videos/list.m3u" DP-1
 ```
 
 ---
 
 ## 配置文件
 
-mpvpaper 支持两个配置文件，位于 `~/.config/mpvpaper/` 目录下：
+Celestia-WallPaper 支持两个配置文件，位于 `~/.config/celestia-wallpaper/` 目录下：
 
 ### pauselist（自动暂停列表）
 
-文件路径：`~/.config/mpvpaper/pauselist`
+文件路径：`~/.config/celestia-wallpaper/pauselist`
 
-当启用 `-p`（自动暂停）时，mpvpaper 会检查此列表中的进程名。如果列表中的任一进程正在运行，mpvpaper 会暂停播放。
+当启用 `-p`（自动暂停）时，celestia-wallpaper 会检查此列表中的进程名。如果列表中的任一进程正在运行，celestia-wallpaper 会暂停播放。
 
 ```
-# ~/.config/mpvpaper/pauselist
+# ~/.config/celestia-wallpaper/pauselist
 firefox
 chromium
 steam
@@ -205,12 +221,12 @@ steam
 
 ### stoplist（自动停止列表）
 
-文件路径：`~/.config/mpvpaper/stoplist`
+文件路径：`~/.config/celestia-wallpaper/stoplist`
 
-当启用 `-s`（自动停止）时，mpvpaper 会检查此列表中的进程名。如果列表中的任一进程正在运行，mpvpaper 会完全停止并启动 `mpvpaper-holder` 占位。
+当启用 `-s`（自动停止）时，celestia-wallpaper 会检查此列表中的进程名。如果列表中的任一进程正在运行，celestia-wallpaper 会完全停止并启动 `celestia-wallpaper-holder` 占位。
 
 ```
-# ~/.config/mpvpaper/stoplist
+# ~/.config/celestia-wallpaper/stoplist
 firefox
 steam
 gamescope
@@ -234,7 +250,7 @@ gamescope
 ### 自动停止（-s）
 
 工作原理：
-1. 与自动暂停类似，但检测到遮挡后会完全停止 mpvpaper
+1. 与自动暂停类似，但检测到遮挡后会完全停止 celestia-wallpaper
 2. 主循环退出，释放所有资源（EGL 表面、Wayland 连接、mpv 实例）
 3. 进程自然退出
 
@@ -263,23 +279,23 @@ gamescope
 
 ```
 mpvpaper-rust/
-├── Cargo.toml                          # 工作区根
+├── Cargo.toml                                  # 工作区根
 ├── proto/
-│   └── wlr-layer-shell-unstable-v1.xml # wlr-layer-shell 协议定义
-├── mpvpaper/                           # 主程序
+│   └── wlr-layer-shell-unstable-v1.xml         # wlr-layer-shell 协议定义
+├── celestia-wallpaper/                         # 主程序
 │   ├── Cargo.toml
 │   └── src/
-│       ├── main.rs                     # 入口、信号处理、主循环
-│       ├── cli.rs                      # clap CLI 参数解析
-│       ├── wayland.rs                  # Wayland 连接、输出管理、图层表面
-│       ├── egl.rs                      # EGL 显示/上下文/表面管理
-│       ├── mpv_ctx.rs                  # mpv 创建、初始化、渲染上下文
-│       ├── monitor.rs                  # 自动暂停/停止线程、监控列表
-│       └── log.rs                      # 彩色终端日志宏
-└── mpvpaper-holder/                    # 占位程序
+│       ├── main.rs                             # 入口、信号处理、主循环
+│       ├── cli.rs                              # clap CLI 参数解析
+│       ├── wayland.rs                          # Wayland 连接、输出管理、图层表面
+│       ├── egl.rs                              # EGL 显示/上下文/表面管理
+│       ├── mpv_ctx.rs                          # mpv 创建、初始化、渲染上下文
+│       ├── monitor.rs                          # 自动暂停/停止线程、监控列表
+│       └── log.rs                              # 彩色终端日志宏
+└── celestia-wallpaper-holder/                  # 占位程序
     ├── Cargo.toml
     └── src/
-        └── main.rs                     # SHM 虚拟缓冲区、恢复逻辑
+        └── main.rs                             # SHM 虚拟缓冲区、恢复逻辑
 ```
 
 ### 模块说明
@@ -393,7 +409,7 @@ loop {
 
 ### 性能分析（heaptrack）
 
-使用 [heaptrack](https://github.com/KDE/heaptrack) 对运行中的 mpvpaper 进行实时堆分析：
+使用 [heaptrack](https://github.com/KDE/heaptrack) 对运行中的 celestia-wallpaper 进行实时堆分析：
 
 | 指标 | 值 |
 |------|-----|
@@ -452,11 +468,15 @@ A: 确保系统已安装 mpv 及其解码器。某些发行版需要额外安装
 
 ### Q: 自动暂停/停止不工作
 
-A: 检查 `~/.config/mpvpaper/pauselist` 或 `stoplist` 文件是否存在且格式正确（每行一个进程名）。自动功能依赖 Wayland 合成器的帧回调行为，某些合成器可能不完全支持。
+A: 检查 `~/.config/celestia-wallpaper/pauselist` 或 `stoplist` 文件是否存在且格式正确（每行一个进程名）。自动功能依赖 Wayland 合成器的帧回调行为，某些合成器可能不完全支持。
 
 ### Q: 多显示器下只显示一个
 
-A: 使用 `mpvpaper -d` 查看所有可用输出名称，为每个显示器分别启动一个 mpvpaper 实例。
+A: 使用 `celestia-wallpaper -d` 查看所有可用输出名称，为每个显示器分别启动一个 celestia-wallpaper 实例。
+
+### Q: 如何从原版 mpvpaper 迁移？
+
+A: 直接将 `mpvpaper` 命令替换为 `celestia-wallpaper`，`mpvpaper-holder` 替换为 `celestia-wallpaper-holder`，并将配置文件从 `~/.config/mpvpaper/` 移到 `~/.config/celestia-wallpaper/` 即可。
 
 ---
 

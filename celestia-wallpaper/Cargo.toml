@@ -1,5 +1,5 @@
 [package]
-name = "mpvpaper"
+name = "celestia-wallpaper"
 version = "1.8.0"
 edition = "2021"
 description = "Video wallpaper player using mpv for wlroots-based Wayland compositors"

@@ -78,6 +78,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "celestia-wallpaper"
+version = "1.8.0"
+dependencies = [
+ "clap",
+ "env_logger",
+ "gl",
+ "khronos-egl",
+ "libc",
+ "libloading",
+ "libmpv-sys",
+ "log",
+ "nix",
+ "wayland-client",
+ "wayland-protocols 0.31.2",
+ "wayland-protocols-wlr",
+]
+
+[[package]]
+name = "celestia-wallpaper-holder"
+version = "1.8.0"
+dependencies = [
+ "libc",
+ "nix",
+ "wayland-client",
+ "wayland-protocols-wlr",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -300,34 +328,6 @@ name = "memchr"
 version = "2.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
-
-[[package]]
-name = "mpvpaper"
-version = "1.8.0"
-dependencies = [
- "clap",
- "env_logger",
- "gl",
- "khronos-egl",
- "libc",
- "libloading",
- "libmpv-sys",
- "log",
- "nix",
- "wayland-client",
- "wayland-protocols 0.31.2",
- "wayland-protocols-wlr",
-]
-
-[[package]]
-name = "mpvpaper-holder"
-version = "1.8.0"
-dependencies = [
- "libc",
- "nix",
- "wayland-client",
- "wayland-protocols-wlr",
-]
 
 [[package]]
 name = "nix"

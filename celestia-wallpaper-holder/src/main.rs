@@ -59,12 +59,12 @@ impl HolderState {
     }
 }
 
-fn revive_mpvpaper(argv: &[String]) {
+fn revive_celestia_wallpaper(argv: &[String]) {
     let exe_path = std::fs::read_link("/proc/self/exe").unwrap_or_default();
     let exe_dir = exe_path.parent().unwrap_or(exe_path.as_ref());
-    let mpvpaper_path = exe_dir.join("mpvpaper");
+    let celestia_wallpaper_path = exe_dir.join("celestia-wallpaper");
 
-    let c_path = CString::new(mpvpaper_path.as_os_str().as_bytes()).unwrap();
+    let c_path = CString::new(celestia_wallpaper_path.as_os_str().as_bytes()).unwrap();
     let c_argv: Vec<CString> = std::iter::once(c_path.clone())
         .chain(argv.iter().map(|a| CString::new(a.as_bytes()).unwrap()))
         .collect();
@@ -231,7 +231,7 @@ impl Dispatch<wl_output::WlOutput, ()> for HolderState {
                         &surface,
                         Some(&output_ref.wl_output),
                         Layer::Background,
-                        "mpvpaper".to_string(),
+                        "celestia-wallpaper".to_string(),
                         qh,
                         (),
                     );
@@ -328,10 +328,10 @@ impl Dispatch<wl_callback::WlCallback, ()> for HolderState {
             if !state.stoplist.is_empty() {
                 check_stoplist(&state.stoplist);
                 if frame_time.wrapping_sub(state.start_time) < 1000 {
-                    revive_mpvpaper(&state.argv_copy);
+                    revive_celestia_wallpaper(&state.argv_copy);
                 }
             } else {
-                revive_mpvpaper(&state.argv_copy);
+                revive_celestia_wallpaper(&state.argv_copy);
             }
 
             state.start_time = frame_time;
@@ -441,7 +441,7 @@ fn load_stoplist() -> Vec<String> {
         Ok(h) => h,
         Err(_) => return Vec::new(),
     };
-    let path = PathBuf::from(home).join(".config/mpvpaper/stoplist");
+    let path = PathBuf::from(home).join(".config/celestia-wallpaper/stoplist");
     match fs::read_to_string(&path) {
         Ok(content) => content.split_whitespace().map(|s| s.to_string()).collect(),
         Err(_) => Vec::new(),
@@ -458,14 +458,14 @@ fn parse_args() -> (String, bool, Vec<String>) {
         match args[i].as_str() {
             "-h" | "--help" => {
                 println!(
-                    "Usage: mpvpaper-holder <mpvpaper options>\n\
+                    "Usage: celestia-wallpaper-holder <celestia-wallpaper options>\n\
                      Description:\n\
-                     mpvpaper-holder acts as a lean gate keeper before mpvpaper can run\n\n\
+                     celestia-wallpaper-holder acts as a lean gate keeper before celestia-wallpaper can run\n\n\
                      It's sole purpose is to check if there is:\n\
                      Any program that is running from the stoplist file\n\
-                     - Set in \"~/.config/mpvpaper/stoplist\"\n\
+                     - Set in \"~/.config/celestia-wallpaper/stoplist\"\n\
                      And if the wallpaper needs to be seen when drawn\n\
-                     - Set with \"-s\" or \"--auto-stop\" mpvpaper option"
+                     - Set with \"-s\" or \"--auto-stop\" celestia-wallpaper option"
                 );
                 std::process::exit(0);
             }
@@ -485,7 +485,7 @@ fn parse_args() -> (String, bool, Vec<String>) {
     }
 
     if monitor.is_empty() {
-        eprintln!("mpvpaper-holder: not enough args");
+        eprintln!("celestia-wallpaper-holder: not enough args");
         std::process::exit(1);
     }
 

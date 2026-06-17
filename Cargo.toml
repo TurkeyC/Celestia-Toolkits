@@ -1,3 +1,7 @@
 [workspace]
-members = ["mpvpaper", "mpvpaper-holder"]
+members = ["celestia-wallpaper", "celestia-wallpaper-holder"]
 resolver = "2"
+
+# Fedora RPM 构建使用 %cargo_build --profile rpm
+[profile.rpm]
+inherits = "release"

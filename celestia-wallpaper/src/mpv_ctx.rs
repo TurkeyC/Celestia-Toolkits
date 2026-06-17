@@ -120,7 +120,7 @@ impl MpvContext {
 
         if let Some(config_content) = mpv_options_config {
             if !config_content.is_empty() {
-                let config_path = format!("/tmp/mpvpaper_{}.config", std::process::id());
+                let config_path = format!("/tmp/celestia-wallpaper_{}.config", std::process::id());
                 if std::fs::write(&config_path, config_content).is_ok() {
                     self.load_config_file(&config_path);
                     let _ = std::fs::remove_file(&config_path);
@@ -133,7 +133,7 @@ impl MpvContext {
         if let Some(vo) = self.get_property_string("options/vo") {
             if vo != "libmpv" {
                 if !vo.is_empty() && verbose > 0 {
-                    log_warning!("mpvpaper does not support any other vo than \"libmpv\"");
+                    log_warning!("celestia-wallpaper does not support any other vo than \"libmpv\"");
                 }
                 self.set_option_string("vo", "libmpv");
             }

@@ -146,7 +146,7 @@ impl WaylandState {
             &surface,
             Some(&output.wl_output),
             self.surface_layer.to_wlr_layer(),
-            "mpvpaper".to_string(),
+            "celestia-wallpaper".to_string(),
             qh,
             (),
         );

@@ -10,7 +10,7 @@ use crate::mpv_ctx::MpvContext;
 
 pub fn load_watch_list(name: &str) -> Option<Vec<String>> {
     let home = std::env::var("HOME").ok()?;
-    let path = PathBuf::from(home).join(".config/mpvpaper").join(name);
+    let path = PathBuf::from(home).join(".config/celestia-wallpaper").join(name);
     let content = fs::read_to_string(&path).ok()?;
     let list: Vec<String> = content.split_whitespace().map(|s| s.to_string()).collect();
     if list.is_empty() { None } else { Some(list) }
@@ -104,7 +104,7 @@ pub fn spawn_auto_pause_thread(
             if !halt_info.frame_ready.load(Ordering::Acquire)
                 && halt_info.is_paused.load(Ordering::Relaxed) == 0
             {
-                log_info!("Pausing because mpvpaper is hidden");
+                log_info!("Pausing because celestia-wallpaper is hidden");
                 mpv.command_async(&["set", "pause", "yes"]);
                 halt_info.is_paused.fetch_add(1, Ordering::Relaxed);
 
@@ -126,7 +126,7 @@ pub fn spawn_auto_stop_thread(
             thread::sleep(Duration::from_secs(2));
 
             if !halt_info.frame_ready.load(Ordering::Acquire) {
-                log_info!("Stopping because mpvpaper is hidden");
+                log_info!("Stopping because celestia-wallpaper is hidden");
                 halt_info.stop_render_loop.store(true, Ordering::Relaxed);
                 return;
             }
@@ -181,7 +181,7 @@ pub fn check_paper_processes() {
     let others = ["swaybg", "glpaper", "hyprpaper", "wpaperd", "swww-daemon"];
     for name in &others {
         if check_pidof(name) {
-            log_warning!("{} is running. This may block mpvpaper from being seen.", name);
+            log_warning!("{} is running. This may block celestia-wallpaper from being seen.", name);
         }
     }
 }

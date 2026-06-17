@@ -2,7 +2,7 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "mpvpaper",
+    name = "celestia-wallpaper",
     about = "Video wallpaper player using mpv for wlroots-based Wayland compositors",
     after_help = "* The auto options might not work as intended\nSee the man page for more details"
 )]
