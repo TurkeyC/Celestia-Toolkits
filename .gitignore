@@ -1,0 +1,5 @@
+target/
+*.zst
+*.dat
+*.swp
+*.swo

@@ -1,0 +1,19 @@
+[package]
+name = "mpvpaper"
+version = "1.8.0"
+edition = "2021"
+description = "Video wallpaper player using mpv for wlroots-based Wayland compositors"
+
+[dependencies]
+wayland-client = { version = "0.31", features = ["system"] }
+wayland-protocols = { version = "0.31", features = ["client"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+khronos-egl = { version = "6", features = ["dynamic"] }
+libloading = "0.8"
+gl = "0.14"
+libmpv-sys = "3"
+clap = { version = "4", features = ["derive"] }
+log = "0.4"
+env_logger = "0.11"
+nix = { version = "0.29", features = ["event", "signal", "poll", "fs", "process"] }
+libc = "0.2"

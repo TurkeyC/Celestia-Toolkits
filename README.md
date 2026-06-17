@@ -1,0 +1,465 @@
+# mpvpaper-rust
+
+> 用 Rust 完全重写的 [mpvpaper](https://github.com/GhostNaN/mpvpaper) —— 基于 wlroots 的 Wayland 合成器视频壁纸播放器。
+
+本项目是原版 C 语言 mpvpaper 的 Rust 重写，包含两个独立二进制文件：`mpvpaper`（主程序）和 `mpvpaper-holder`（占位程序）。功能与原版完全对齐，代码更加安全、可维护。
+
+---
+
+## 目录
+
+- [项目概述](#项目概述)
+- [与 C 原版的对比](#与-c-原版的对比)
+- [系统要求](#系统要求)
+- [构建依赖](#构建依赖)
+- [编译与安装](#编译与安装)
+- [使用方法](#使用方法)
+  - [mpvpaper](#mpvpaper)
+  - [mpvpaper-holder](#mpvpaper-holder)
+- [命令行参数详解](#命令行参数详解)
+- [配置文件](#配置文件)
+  - [pauselist（自动暂停列表）](#pauselist自动暂停列表)
+  - [stoplist（自动停止列表）](#stoplist自动停止列表)
+- [自动功能说明](#自动功能说明)
+  - [自动暂停（-p）](#自动暂停-p)
+  - [自动停止（-s）](#自动停止-s)
+- [图层（Layer）说明](#图层layer说明)
+- [架构概览](#架构概览)
+  - [工作区结构](#工作区结构)
+  - [模块说明](#模块说明)
+  - [线程模型](#线程模型)
+  - [主循环](#主循环)
+- [技术栈](#技术栈)
+- [常见问题](#常见问题)
+- [许可证](#许可证)
+
+---
+
+## 项目概述
+
+mpvpaper 是一个在 Wayland 桌面上播放视频壁纸的工具。它通过 `wlr-layer-shell` 协议将 mpv 的渲染输出直接绘制到桌面背景层，支持：
+
+- 播放本地视频或网络流
+- 多显示器支持
+- 自动暂停/停止（当其他窗口遮挡壁纸时节省资源）
+- 幻灯片模式（定时切换壁纸）
+- 播放列表支持
+- 可配置的图层（background / bottom / top / overlay）
+
+---
+
+## 与 C 原版的对比
+
+| 特性 | C 原版 | Rust 重写 |
+|------|--------|-----------|
+| 语言 | C | Rust |
+| Wayland 绑定 | 手写 C 绑定 | `wayland-client` crate（类型安全） |
+| EGL 加载 | 直接链接 | `khronos-egl` 动态加载（更灵活） |
+| mpv 绑定 | 手写 FFI | `libmpv-sys` crate |
+| 内存安全 | 手动管理 | Rust 所有权系统 |
+| 线程安全 | 无保证 | `Send`/`Sync` 编译期检查 |
+| CLI 解析 | getopt | clap derive（类型安全） |
+| 错误处理 | 返回值检查 | `Result` + `?` 操作符 |
+| 安全退出 | `execv`/`exit` 无清理 | 主循环 break + 所有 Drop 自动释放 |
+| 进程检测 | `pidof` 子进程（每次 spawn） | 直接扫描 `/proc/*/comm` |
+| 事件等待 | `wait_event(0)` + `sleep(10ms)` | `wait_event(0.05)` 单调用 |
+| 帧同步 | 帧回调 Done 内直接 `render()` | 写入 `eventfd` 唤醒主循环再渲染 |
+
+---
+
+## 系统要求
+
+- **操作系统**：Linux（基于 wlroots 的 Wayland 合成器，如 Sway、Hyprland、river 等）
+- **Rust**：1.70+（推荐使用 `rustup` 安装）
+- **mpv**：已安装并可在 PATH 中找到（运行时依赖，非编译依赖）
+
+---
+
+## 构建依赖
+
+编译前需要安装以下系统包（以 Fedora 为例）：
+
+```bash
+sudo dnf install wayland-devel mesa-libEGL-devel mpv-devel
+```
+
+其他发行版对应的包名：
+
+| 发行版 | 包名 |
+|--------|------|
+| Arch Linux | `wayland` `mesa` `mpv` |
+| Ubuntu/Debian | `libwayland-dev` `libegl-dev` `libmpv-dev` |
+| openSUSE | `wayland-devel` `Mesa-libEGL-devel` `mpv-devel` |
+
+---
+
+## 编译与安装
+
+```bash
+# 进入项目目录
+cd mpvpaper-rust/
+
+# 编译（Debug 模式）
+cargo build
+
+# 编译（Release 模式，推荐）
+cargo build --release
+
+# 安装到系统（可选）
+sudo cp target/release/mpvpaper /usr/local/bin/
+sudo cp target/release/mpvpaper-holder /usr/local/bin/
+```
+
+编译产物位于：
+- `target/release/mpvpaper` — 主程序
+- `target/release/mpvpaper-holder` — 占位程序
+
+---
+
+## 使用方法
+
+### mpvpaper
+
+基本用法：
+
+```bash
+# 在指定显示器上播放视频
+mpvpaper <OUTPUT> <视频路径或URL>
+
+# 示例：在 DP-1 上播放本地视频
+mpvpaper DP-1 /path/to/video.mp4
+
+# 示例：在 HDMI-A-1 上播放网络视频
+mpvpaper HDMI-A-1 https://example.com/video.mp4
+
+# 查看所有可用显示器
+mpvpaper -d
+
+# 启用详细日志
+mpvpaper -vv DP-1 video.mp4
+
+# 使用播放列表
+mpvpaper -o "--playlist=/path/to/playlist.m3u" DP-1
+
+# 设置图层为 bottom
+mpvpaper -l bottom DP-1 video.mp4
+
+# 后台运行（fork 模式）
+mpvpaper -f DP-1 video.mp4
+```
+
+### mpvpaper-holder
+
+`mpvpaper-holder` 通常不需要手动运行。它由 `mpvpaper` 在自动停止模式下自动启动，用于在 mpvpaper 暂停时"占住"壁纸表面，防止合成器回收该图层。
+
+```bash
+# 手动运行（调试用）
+mpvpaper-holder <OUTPUT>
+```
+
+---
+
+## 命令行参数详解
+
+| 参数 | 长参数 | 说明 |
+|------|--------|------|
+| `-d` | `--help-output` | 列出所有可用的 Wayland 输出（显示器）并退出 |
+| `-v` | `--verbose` | 增加日志详细程度，可叠加使用（`-v`、`-vv`、`-vvv`） |
+| `-f` | `--fork` | 启动后 fork 到后台运行 |
+| `-p` | `--auto-pause` | 启用自动暂停：当壁纸被其他窗口完全遮挡时暂停播放 |
+| `-s` | `--auto-stop` | 启用自动停止：当壁纸被遮挡时停止并退出进程 |
+| `-n <秒数>` | `--slideshow <秒数>` | 幻灯片模式：每隔指定秒数切换到播放列表中的下一个视频 |
+| `-l <图层>` | `--layer <图层>` | 设置壁纸图层，可选：`background`（默认）、`bottom`、`top`、`overlay` |
+| `-o <选项>` | `--mpv-options <选项>` | 传递额外选项给 mpv（用空格分隔，需要引号包裹） |
+| — | `<OUTPUT>` | 目标显示器名称（如 `DP-1`、`HDMI-A-1`、`eDP-1`） |
+| — | `<URL_OR_PATH>` | 视频文件路径或网络 URL |
+
+**关于 `-o` 参数的示例：**
+
+```bash
+# 设置循环播放和静音
+mpvpaper -o "--loop --mute=yes" DP-1 video.mp4
+
+# 使用播放列表文件
+mpvpaper -o "--playlist=~/videos/list.m3u" DP-1
+```
+
+---
+
+## 配置文件
+
+mpvpaper 支持两个配置文件，位于 `~/.config/mpvpaper/` 目录下：
+
+### pauselist（自动暂停列表）
+
+文件路径：`~/.config/mpvpaper/pauselist`
+
+当启用 `-p`（自动暂停）时，mpvpaper 会检查此列表中的进程名。如果列表中的任一进程正在运行，mpvpaper 会暂停播放。
+
+```
+# ~/.config/mpvpaper/pauselist
+firefox
+chromium
+steam
+```
+
+### stoplist（自动停止列表）
+
+文件路径：`~/.config/mpvpaper/stoplist`
+
+当启用 `-s`（自动停止）时，mpvpaper 会检查此列表中的进程名。如果列表中的任一进程正在运行，mpvpaper 会完全停止并启动 `mpvpaper-holder` 占位。
+
+```
+# ~/.config/mpvpaper/stoplist
+firefox
+steam
+gamescope
+```
+
+> **注意**：列表文件的格式为每行一个进程名，通过扫描 `/proc/*/comm` 检测进程是否存在（不依赖外部命令）。
+
+---
+
+## 自动功能说明
+
+### 自动暂停（-p）
+
+工作原理：
+1. 启动一个后台线程，每 2 秒检查一次壁纸是否可见
+2. 如果壁纸被完全遮挡（无帧回调）且 mpv 未暂停，则发送暂停命令
+3. 当壁纸重新可见时，自动恢复播放
+
+适用场景：全屏游戏或应用时节省 CPU/GPU 资源。
+
+### 自动停止（-s）
+
+工作原理：
+1. 与自动暂停类似，但检测到遮挡后会完全停止 mpvpaper
+2. 主循环退出，释放所有资源（EGL 表面、Wayland 连接、mpv 实例）
+3. 进程自然退出
+
+适用场景：长时间不需要壁纸时彻底释放资源。
+
+---
+
+## 图层（Layer）说明
+
+`wlr-layer-shell` 协议定义了 4 个图层，从下到上依次为：
+
+| 图层 | 说明 | 典型用途 |
+|------|------|----------|
+| `background` | 最底层，在所有窗口之下 | **壁纸（默认）** |
+| `bottom` | 在 background 之上，窗口之下 | 桌面小组件 |
+| `top` | 在窗口之上 | 面板、状态栏 |
+| `overlay` | 最顶层，覆盖所有窗口 | 通知、锁屏 |
+
+对于壁纸用途，通常使用 `background`（默认值）即可。
+
+---
+
+## 架构概览
+
+### 工作区结构
+
+```
+mpvpaper-rust/
+├── Cargo.toml                          # 工作区根
+├── proto/
+│   └── wlr-layer-shell-unstable-v1.xml # wlr-layer-shell 协议定义
+├── mpvpaper/                           # 主程序
+│   ├── Cargo.toml
+│   └── src/
+│       ├── main.rs                     # 入口、信号处理、主循环
+│       ├── cli.rs                      # clap CLI 参数解析
+│       ├── wayland.rs                  # Wayland 连接、输出管理、图层表面
+│       ├── egl.rs                      # EGL 显示/上下文/表面管理
+│       ├── mpv_ctx.rs                  # mpv 创建、初始化、渲染上下文
+│       ├── monitor.rs                  # 自动暂停/停止线程、监控列表
+│       └── log.rs                      # 彩色终端日志宏
+└── mpvpaper-holder/                    # 占位程序
+    ├── Cargo.toml
+    └── src/
+        └── main.rs                     # SHM 虚拟缓冲区、恢复逻辑
+```
+
+### 模块说明
+
+#### `main.rs`
+程序入口。负责：
+- 解析命令行参数
+- 初始化 Wayland 连接和 EGL
+- 创建 mpv 实例和渲染上下文
+- 设置 `eventfd` 用于 mpv 渲染唤醒
+- 运行 `poll()` 主循环，处理 Wayland 事件和 mpv 渲染更新
+
+#### `cli.rs`
+使用 `clap` derive API 定义所有命令行参数，包含参数验证和图层枚举转换。
+
+#### `wayland.rs`
+管理 Wayland 连接和协议交互：
+- `WaylandState`：持有 display、compositor、layer_shell 和输出列表
+- `DisplayOutput`：每个显示器的状态（尺寸、缩放、EGL 窗口/表面、帧回调）
+- 实现 `Dispatch` trait 处理 Wayland 事件
+
+#### `egl.rs`
+EGL 动态加载和上下文管理：
+- 使用 `khronos-egl` 的 `DynamicInstance<EGL1_5>` 动态加载 `libEGL.so`
+- 使用过滤属性（`SURFACE_TYPE | WINDOW_BIT | RGBA8 | OPENGL_BIT`）精确选择 EGL config
+- 按 OpenGL → GLES → fallback 顺序尝试创建上下文，避免无过滤遍历
+- 管理每个输出的 EGL 表面
+
+#### `mpv_ctx.rs`
+libmpv FFI 的安全封装：
+- `MpvContext`：mpv 实例的创建、配置、初始化
+- `MpvRenderContext`：OpenGL 渲染上下文的创建和渲染
+- 命令发送、属性观察、事件等待
+
+#### `monitor.rs`
+后台监控线程：
+- `spawn_mpv_event_thread`：处理 mpv 事件（关闭、属性变化、幻灯片计时），使用 `wait_event(0.05)` 事件驱动等待，不忙等
+- `spawn_auto_pause_thread`：自动暂停/恢复逻辑
+- `spawn_auto_stop_thread`：自动停止逻辑，通过 `stop_render_loop` 标志通知主循环退出
+- `spawn_pauselist_thread` / `spawn_stoplist_thread`：扫描 `/proc/*/comm` 检测进程（不依赖 `pidof` 子进程）
+
+#### `log.rs`
+彩色终端日志宏：
+- `[+]` 绿色：成功信息
+- `[-]` 红色：错误信息
+- `[!]` 黄色：警告信息
+- `[*]` 蓝色：普通信息
+
+### 线程模型
+
+```
+主线程
+  └── poll() 主循环（Wayland 事件 + mpv 渲染）
+
+spawn_mpv_event_thread 线程
+  └── 等待 mpv 事件（wait_event 50ms timeout），写入 eventfd 唤醒主线程
+
+spawn_auto_pause_thread 线程（-p 模式）
+  └── 检测可见性，暂停/恢复 mpv
+
+spawn_auto_stop_thread 线程（-s 模式）
+  └── 检测可见性，设置 stop_render_loop 标志，通知主循环退出
+
+spawn_pauselist_thread 线程（-p 模式）
+  └── 扫描 /proc 监控 pauselist 中的进程
+
+spawn_stoplist_thread 线程（-s 模式）
+  └── 扫描 /proc 监控 stoplist 中的进程
+```
+
+线程间通过 `Arc<HaltInfo>` 共享状态，使用 `AtomicBool` / `AtomicI32` 进行无锁同步。
+
+### 主循环
+
+```
+loop {
+    1. event_queue.prepare_read()        // 准备读取 Wayland 事件
+    2. event_queue.flush()               // 刷新输出缓冲区
+    3. poll([wayland_fd, wakeup_fd], timeout=16ms)
+    4. 如果 wayland_fd 可读：ReadEventsGuard::read() + dispatch_pending()
+    5. 检查 stop_render_loop 标志
+    6. 如果 wakeup_fd 可读：
+       - mpv_render_context_update()
+       - 对每个输出：渲染（有帧回调可用）或设置 redraw_needed（等待帧回调）
+}
+```
+
+- `wakeup_fd`（eventfd）由 mpv 的 `render_update_callback` 写入，通知主线程新帧就绪
+- 帧回调 `Done` 事件处理中如果发现 `redraw_needed`，立即写入 wakeup_fd 触发重新渲染（避免丢失帧）
+- `stop_render_loop` 由 `spawn_auto_stop_thread` 或 `spawn_mpv_event_thread`（收到 `MPV_EVENT_SHUTDOWN`）设置
+
+---
+
+## 性能优化
+
+### 已完成的优化
+
+| 优化项 | 说明 | 效果 |
+|--------|------|------|
+| 移除冗余 FFI 查询 | 事件线程不再每 50ms 额外调用 `get_property_flag("pause")`，pause 状态由事件驱动更新 | 消除每秒 20 次不必要的 FFI + 堆分配 |
+| EGL config 过滤 | `choose_config` 使用 `WINDOW_BIT \| RGBA8 \| OPENGL_BIT` 过滤属性 | 避免遍历数百个无关 config |
+| 内存顺序修正 | `SeqCst` → `Relaxed`/`Acquire`/`Release` | 消除 x86 `mfence` 指令 |
+| `/proc` 替代 `pidof` | 直接扫描 `/proc/*/comm` 而非 spawn 子进程 | 消除每秒的进程创建开销 |
+| `eventfd` 生命周期 | `OnceLock<EventFd>` 替代 `mem::forget` | 修复资源泄漏 |
+| `Arc<MpvContext>` | 替代 raw pointer + `mem::forget` | 线程安全退出时自动调用 `mpv_terminate_destroy` |
+| `wait_event(0.05)` | 替代 `wait_event(0) + sleep(10ms)` | 轮询频率从 100Hz 降至 20Hz |
+| auto-pause 忙等间隔 | 内部循环从 10ms 改为 100ms | 隐藏时 CPU 占用降低 90%+ |
+| auto-stop 修复 | 设置 `stop_render_loop` 通知主循环退出 | 修复进程空转直至段错误的 bug |
+| `format_args!` | 日志宏改用 `format_args!` 避免中间 `String` | 减少非必要堆分配 |
+| `swap_remove` | 替换 `Vec::remove` | 输出移除 O(n) → O(1) |
+
+### 性能分析（heaptrack）
+
+使用 [heaptrack](https://github.com/KDE/heaptrack) 对运行中的 mpvpaper 进行实时堆分析：
+
+| 指标 | 值 |
+|------|-----|
+| 峰值堆内存 | ~395 MB |
+| 分配调用总次数 | ~365 万次（7,850/s） |
+| 临时分配 | ~118 万次 |
+| 泄漏 | ~81 MB（来自 mpv/FFmpeg 内部 Lua/ASS 路径） |
+
+**热点分布：**
+- `av_malloc` (FFmpeg 解码器): 84 万次/267 MB 峰值 — **h.264 参考帧池**
+- `ta_alloc_size` (libmpv 内部): 119 万次/1.2 MB 峰值 — **mpv 字符串/配置分配**
+- Rust 代码: 几乎为 0 — **所有主要分配均在 C 库中**
+
+> 结论：峰值 ~395 MB 中约 99% 由 C 库（FFmpeg、libmpv、NVIDIA 驱动）分配，Rust 封装层占用 <2 MB。性能已与 C 原版对齐。
+
+### 编译优化
+
+默认以 Cargo Release 模式编译时启用 LTO 和优化。如需进一步减小体积：
+
+```bash
+RUSTFLAGS="-C target-cpu=native" cargo build --release
+```
+
+---
+
+## 技术栈
+
+| 组件 | 依赖 | 版本 | 用途 |
+|------|------|------|------|
+| Wayland 客户端 | `wayland-client` | 0.31 | Wayland 协议交互 |
+| Wayland 协议 | `wayland-protocols` | 0.31 | 标准协议（xdg-shell 等） |
+| WLR 协议 | `wayland-protocols-wlr` | 0.3 | wlr-layer-shell 协议 |
+| EGL | `khronos-egl` | 6 | 动态 EGL 加载 |
+| OpenGL | `gl` | 0.14 | OpenGL 函数绑定 |
+| mpv | `libmpv-sys` | 3 | libmpv FFI 绑定 |
+| CLI | `clap` | 4 | 命令行参数解析 |
+| 日志 | `log` + `env_logger` | 0.4 / 0.11 | 日志框架 |
+| 系统调用 | `nix` | 0.29 | eventfd、signal、poll、shm |
+| FFI | `libc` | 0.2 | C FFI 类型 |
+
+---
+
+## 常见问题
+
+### Q: 编译时报错找不到 `wayland-client.pc`
+
+A: 需要安装 `wayland-devel` 包（Fedora）或 `libwayland-dev`（Debian/Ubuntu）。
+
+### Q: 运行时显示 `EGL 初始化失败`
+
+A: 确保已安装 `mesa-libEGL-devel`（Fedora）或 `libegl-dev`（Debian/Ubuntu），并且显卡驱动正确安装。
+
+### Q: 视频无法播放，mpv 报错
+
+A: 确保系统已安装 mpv 及其解码器。某些发行版需要额外安装 `ffmpeg` 或 `gstreamer` 插件。
+
+### Q: 自动暂停/停止不工作
+
+A: 检查 `~/.config/mpvpaper/pauselist` 或 `stoplist` 文件是否存在且格式正确（每行一个进程名）。自动功能依赖 Wayland 合成器的帧回调行为，某些合成器可能不完全支持。
+
+### Q: 多显示器下只显示一个
+
+A: 使用 `mpvpaper -d` 查看所有可用输出名称，为每个显示器分别启动一个 mpvpaper 实例。
+
+---
+
+## 许可证
+
+本项目遵循与原版 mpvpaper 相同的许可证（GPLv3）。

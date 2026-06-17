@@ -1,0 +1,11 @@
+[package]
+name = "mpvpaper-holder"
+version = "1.8.0"
+edition = "2021"
+description = "Lean placeholder that holds the wallpaper surface while mpvpaper is stopped"
+
+[dependencies]
+wayland-client = "0.31"
+nix = { version = "0.29", features = ["signal", "process", "fs", "mman"] }
+libc = "0.2"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
