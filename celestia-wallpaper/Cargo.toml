@@ -17,3 +17,7 @@ log = "0.4"
 env_logger = "0.11"
 nix = { version = "0.29", features = ["event", "signal", "poll", "fs", "process"] }
 libc = "0.2"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp"] }
+rusty_spine = { git = "https://github.com/jabuwu/rusty_spine.git", rev = "bbe1cd699c058fab3e16435153605d33cc91ac3a", features = ["spine38"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"

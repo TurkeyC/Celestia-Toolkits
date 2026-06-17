@@ -1,12 +1,18 @@
 use clap::Parser;
 
+use crate::renderer::WallpaperType;
+
 #[derive(Parser, Debug)]
 #[command(
     name = "celestia-wallpaper",
-    about = "Video wallpaper player using mpv for wlroots-based Wayland compositors",
+    about = "Multi-type video wallpaper player for wlroots-based Wayland compositors",
     after_help = "* The auto options might not work as intended\nSee the man page for more details"
 )]
 pub struct Args {
+    #[arg(short = 't', long = "type", value_name = "TYPE")]
+    /// Wallpaper type: video, picture, spine, web (auto-detected from file extension if omitted)
+    pub wallpaper_type: Option<String>,
+
     #[arg(short = 'd', long = "help-output")]
     pub help_output: bool,
 
@@ -37,6 +43,25 @@ pub struct Args {
     pub output: Option<String>,
 
     pub url_or_path: Option<String>,
+}
+
+impl Args {
+    /// Determine the wallpaper type from --type flag or auto-detect from file path.
+    pub fn wallpaper_type(&self) -> Option<WallpaperType> {
+        if let Some(ref t) = self.wallpaper_type {
+            match t.to_lowercase().as_str() {
+                "video" => Some(WallpaperType::Video),
+                "picture" | "image" => Some(WallpaperType::Picture),
+                "spine" => Some(WallpaperType::Spine),
+                "web" | "html" => Some(WallpaperType::Web),
+                _ => None,
+            }
+        } else if let Some(ref path) = self.url_or_path {
+            WallpaperType::from_path(path)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
