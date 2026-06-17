@@ -17,3 +17,4 @@ ctrlc = "3.5"
 base64 = "0.22"
 cpal = "0.17"
 ringbuf = "0.5"
+kitdraw = { path = "kitdraw" }

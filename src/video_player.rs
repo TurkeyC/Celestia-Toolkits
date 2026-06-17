@@ -794,7 +794,108 @@ pub fn play(config: &Config, file_path: &str) -> Result<(), Box<dyn std::error::
                     break 'outer;
                 }
             } else {
-                break 'outer;
+                // Pause at end: keep last frame displayed, process keyboard commands.
+                // The user can seek (resume playback), resize, or quit.
+                update_status(&status, |state| {
+                    state.message = String::from("End of video. q=quit, f/b/arrows=seek, g=goto");
+                });
+                let _ = render_sender.send(RenderMessage::RedrawStatus);
+
+                'paused: loop {
+                    if !running.load(Ordering::SeqCst) {
+                        break 'paused;
+                    }
+                    match command_receiver.try_recv() {
+                        Ok(PlayerCommand::Quit) => {
+                            running.store(false, Ordering::SeqCst);
+                            let _ = render_sender.send(RenderMessage::Quit);
+                            break 'paused;
+                        }
+                        Ok(PlayerCommand::SeekBy(delta_ms)) => {
+                            let current_ms = position_ms.load(Ordering::SeqCst);
+                            let target_ms = if delta_ms.is_negative() {
+                                current_ms.saturating_sub(delta_ms.unsigned_abs())
+                            } else {
+                                current_ms.saturating_add(delta_ms as u64)
+                            };
+                            let _ = seek_playback_to_ms(
+                                target_ms,
+                                &mut playback,
+                                format_ctx,
+                                video_stream_index,
+                                video_stream_ptr,
+                                codec_ctx,
+                                has_audio,
+                                audio_codec_ctx,
+                                &reset_audio,
+                                &audio_clock,
+                                &playback_generation,
+                                &position_ms,
+                                &status,
+                                &render_sender,
+                                None,
+                            );
+                            // Seek succeeded — resume decode loop
+                            break 'paused;
+                        }
+                        Ok(PlayerCommand::SeekTo(target_ms)) => {
+                            let _ = seek_playback_to_ms(
+                                target_ms,
+                                &mut playback,
+                                format_ctx,
+                                video_stream_index,
+                                video_stream_ptr,
+                                codec_ctx,
+                                has_audio,
+                                audio_codec_ctx,
+                                &reset_audio,
+                                &audio_clock,
+                                &playback_generation,
+                                &position_ms,
+                                &status,
+                                &render_sender,
+                                None,
+                            );
+                            break 'paused;
+                        }
+                        Ok(PlayerCommand::VolumeBy(delta)) => {
+                            let next = adjust_volume_percent(playback.volume_percent, delta);
+                            playback.volume_percent = next;
+                            volume_percent_atomic.store(next, Ordering::SeqCst);
+                            update_status(&status, |state| {
+                                state.volume_percent = next;
+                                state.message = format!("Volume {next}%");
+                            });
+                            let _ = render_sender.try_send(RenderMessage::RedrawStatus);
+                        }
+                        Ok(PlayerCommand::Resize(cols, rows)) => {
+                            let layout = VideoTerminalLayout::from_cells(cols, rows);
+                            let display_size =
+                                fit_video_display_size(orig_w, orig_h, config.zoom, layout);
+                            playback.terminal_layout = layout;
+                            if display_size != playback.display_size {
+                                playback.display_size = display_size;
+                                output_buffer = output_buffer_for(display_size);
+                                if !sws_ctx.is_null() {
+                                    sws_freeContext(sws_ctx);
+                                    sws_ctx = std::ptr::null_mut();
+                                }
+                            }
+                            update_status(&status, |state| {
+                                state.message = String::from("Resized");
+                            });
+                            let _ = render_sender.send(RenderMessage::Layout(layout));
+                        }
+                        Err(_) => {}
+                    }
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+
+                // If the user quit, exit the outer loop
+                if !running.load(Ordering::SeqCst) {
+                    break 'outer;
+                }
+                // Otherwise a seek happened — continue the decode loop
             }
         }
 
