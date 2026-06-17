@@ -14,9 +14,11 @@ BuildRequires:  rust
 BuildRequires:  pkgconfig(wayland-client)
 BuildRequires:  pkgconfig(wayland-egl)
 BuildRequires:  pkgconfig(mpv)
+BuildRequires:  pkgconfig(luajit)
 
 Requires:       mesa-libEGL
 Requires:       mpv-libs
+Requires:       luajit
 
 %description
 Celestia-WallPaper is a video wallpaper program for wlroots-based Wayland

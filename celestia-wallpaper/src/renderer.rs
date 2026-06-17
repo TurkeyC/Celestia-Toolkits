@@ -27,7 +27,7 @@ impl WallpaperType {
             || lower.ends_with(".webp")
         {
             Some(WallpaperType::Picture)
-        } else if lower.ends_with(".spine.toml") || lower.ends_with(".json") || lower.ends_with(".skel") {
+        } else if lower.ends_with(".spine.toml") || lower.ends_with(".spine.lua") || lower.ends_with(".json") || lower.ends_with(".skel") {
             Some(WallpaperType::Spine)
         } else if lower.ends_with(".html") || lower.ends_with(".htm") {
             Some(WallpaperType::Web)

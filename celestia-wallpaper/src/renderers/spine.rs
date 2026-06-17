@@ -13,6 +13,9 @@ use crate::renderer::WallpaperRenderer;
 use crate::wayland::HaltInfo;
 use crate::WAKEUP_FD;
 
+#[cfg(feature = "lua-scripting")]
+use crate::renderers::spine_lua::{Command as LuaCommand, LuaRuntime};
+
 use rusty_spine::{
     self,
     atlas::AtlasPage,
@@ -190,6 +193,10 @@ pub struct SpineRenderer {
     /// Display overrides from config.
     display_config: DisplayConfig,
 
+    /// Lua scripting runtime (only for `.spine.lua` configs).
+    #[cfg(feature = "lua-scripting")]
+    lua_runtime: RefCell<Option<LuaRuntime>>,
+
     initialized: bool,
 }
 
@@ -208,6 +215,8 @@ impl SpineRenderer {
             skel_height: Cell::new(0.0),
             anim_sequence: RefCell::new(None),
             display_config: DisplayConfig::default(),
+            #[cfg(feature = "lua-scripting")]
+            lua_runtime: RefCell::new(None),
             initialized: false,
         }
     }
@@ -312,6 +321,50 @@ impl SpineRenderer {
         parent.join(skel_rel).to_string_lossy().to_string()
     }
 
+    // ---- Lua config helpers (only for .spine.lua) -----------------------
+
+    /// Extract `skeleton = "path"` from a Lua script without executing it.
+    #[cfg(feature = "lua-scripting")]
+    fn extract_lua_skeleton_path(script: &str) -> Option<String> {
+        for line in script.lines() {
+            let s = line.trim();
+            if s.starts_with("--") {
+                continue;
+            }
+            if let Some(eq_pos) = s.find('=') {
+                let key = s[..eq_pos].trim();
+                if key == "skeleton" {
+                    let val = s[eq_pos + 1..].trim().trim_matches('"').trim_matches('\'').trim();
+                    if !val.is_empty() {
+                        return Some(val.to_string());
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Parse `scale`, `offset_x`, `offset_y` from a Lua script text.
+    #[cfg(feature = "lua-scripting")]
+    fn parse_lua_display_config(script: &str) -> DisplayConfig {
+        let mut dc = DisplayConfig::default();
+        for line in script.lines() {
+            let s = line.trim();
+            if s.starts_with("--") { continue; }
+            if let Some(eq_pos) = s.find('=') {
+                let key = s[..eq_pos].trim();
+                let val_str = s[eq_pos + 1..].trim().trim_matches('"').trim().to_string();
+                match key {
+                    "scale" => dc.scale = val_str.parse().unwrap_or(0.0),
+                    "offset_x" => dc.offset_x = val_str.parse().unwrap_or(0.0),
+                    "offset_y" => dc.offset_y = val_str.parse().unwrap_or(0.0),
+                    _ => {}
+                }
+            }
+        }
+        dc
+    }
+
     // ---- bounding box ----------------------------------------------------
 
     fn renderable_bounds(renderables: &[rusty_spine::SkeletonRenderable]) -> (f32, f32, f32, f32) {
@@ -391,10 +444,17 @@ impl WallpaperRenderer for SpineRenderer {
         }
 
         // ---- determine skeleton path & config ------------------------------
-        let is_config = self.file_path.to_lowercase().ends_with(".spine.toml");
+        let lower_path = self.file_path.to_lowercase();
+        let is_toml = lower_path.ends_with(".spine.toml");
+        let is_lua = lower_path.ends_with(".spine.lua");
+
+        // For Lua mode we need to keep the script content across the
+        // skeleton-loading boundary.
+        #[cfg(feature = "lua-scripting")]
+        let mut lua_script_content: Option<String> = None;
 
         // Read config (if applicable) so we have display / anim settings.
-        if is_config {
+        if is_toml {
             let content = std::fs::read_to_string(&self.file_path)?;
             let cfg: SpineConfig = toml::from_str(&content)?;
             self.display_config = cfg.display;
@@ -406,6 +466,27 @@ impl WallpaperRenderer for SpineRenderer {
             // Set up animation sequence.
             if !cfg.anim.is_empty() {
                 *self.anim_sequence.borrow_mut() = Some(AnimationSequence::new(cfg.anim));
+            }
+        } else if is_lua {
+            #[cfg(not(feature = "lua-scripting"))]
+            return Err("Lua scripting is not enabled.  Rebuild with --features lua-scripting \
+                         or install luajit-devel (Fedora: dnf install luajit-devel)"
+                .into());
+
+            #[cfg(feature = "lua-scripting")]
+            {
+                let content = std::fs::read_to_string(&self.file_path)?;
+                let skel_rel = Self::extract_lua_skeleton_path(&content)
+                    .ok_or_else(|| ".spine.lua must define skeleton = \"path\"".to_string())?;
+                self.file_path = Self::resolve_skel_path(&self.file_path, &skel_rel);
+                self.display_config = Self::parse_lua_display_config(&content);
+                lua_script_content = Some(content);
+
+                if self.verbose > 0 {
+                    log_info!("Lua config: skeleton={}, scale={}, offset=({},{})",
+                        self.file_path, self.display_config.scale,
+                        self.display_config.offset_x, self.display_config.offset_y);
+                }
             }
         }
 
@@ -428,30 +509,67 @@ impl WallpaperRenderer for SpineRenderer {
         self.skel_width.set(skel_w);
         self.skel_height.set(skel_h);
 
-        // ---- start animation(s) --------------------------------------------
-        let anim_names: Vec<String> =
-            controller.skeleton.data().animations().map(|a| a.name().to_string()).collect();
+        // ---- start animation(s) / Lua init --------------------------------
+        if is_toml || !is_lua {
+            // TOML-driven or default
+            let anim_names: Vec<String> =
+                controller.skeleton.data().animations().map(|a| a.name().to_string()).collect();
 
-        if let Some(ref seq) = *self.anim_sequence.borrow() {
-            // Config-driven.
-            if let Some(first) = seq.entries.first() {
-                let _ = controller
-                    .animation_state
-                    .set_animation_by_name(0, &first.name, first.loop_anim);
-                if self.verbose > 0 {
-                    log_info!("Anim sequence: {} entries, starting with '{}'",
-                        seq.entries.len(), first.name);
+            if let Some(ref seq) = *self.anim_sequence.borrow() {
+                if let Some(first) = seq.entries.first() {
+                    let _ = controller
+                        .animation_state
+                        .set_animation_by_name(0, &first.name, first.loop_anim);
+                    if self.verbose > 0 {
+                        log_info!("Anim sequence: {} entries, starting with '{}'",
+                            seq.entries.len(), first.name);
+                    }
+                }
+            } else {
+                if let Some(ref name) = Self::pick_animation_name(&anim_names) {
+                    let _ = controller
+                        .animation_state
+                        .set_animation_by_name(0, name, true);
+                    if self.verbose > 0 {
+                        log_info!("Spine skeleton loaded: {}x{}, animation: {}",
+                            skel_w as i32, skel_h as i32, name);
+                    }
                 }
             }
-        } else {
-            // Default: first animation, looping.
-            if let Some(ref name) = Self::pick_animation_name(&anim_names) {
-                let _ = controller
-                    .animation_state
-                    .set_animation_by_name(0, name, true);
+        }
+
+        #[cfg(feature = "lua-scripting")]
+        if is_lua {
+            if let Some(ref script) = lua_script_content {
+                let runtime = LuaRuntime::new(script, &mut controller)
+                    .map_err(|e| format!("Lua init error: {e}"))?;
+                runtime.call_init();
+
+                // Process play commands from on_init immediately so the first
+                // render frame has an animation to show.
+                for cmd in runtime.drain_commands() {
+                    match cmd {
+                        LuaCommand::Play { track, name, looping } => {
+                            let _ = controller.animation_state
+                                .set_animation_by_name(track, &name, looping);
+                        }
+                        LuaCommand::Add { track, name, looping, delay } => {
+                            let _ = controller.animation_state
+                                .add_animation_by_name(track, &name, looping, delay);
+                        }
+                        LuaCommand::ClearTrack(track) => {
+                            controller.animation_state.clear_track(track);
+                        }
+                        LuaCommand::Empty { track, mix_duration } => {
+                            controller.animation_state.set_empty_animation(track, mix_duration);
+                        }
+                    }
+                }
+
+                *self.lua_runtime.borrow_mut() = Some(runtime);
+
                 if self.verbose > 0 {
-                    log_info!("Spine skeleton loaded: {}x{}, animation: {}",
-                        skel_w as i32, skel_h as i32, name);
+                    log_success!("Lua scripting runtime initialised");
                 }
             }
         }
@@ -502,9 +620,44 @@ impl WallpaperRenderer for SpineRenderer {
         // --- advance animation ----------------------------------------------
         controller.update(dt);
 
-        // Advance sequence timer (only if config has animations with duration > 0).
-        if let Some(ref mut seq) = *self.anim_sequence.borrow_mut() {
-            seq.advance(controller, dt);
+        // Lua-driven or TOML-sequence advancement.
+        #[cfg(feature = "lua-scripting")]
+        if let Some(ref lua) = *self.lua_runtime.borrow() {
+            lua.call_completions();
+            lua.call_update(dt);
+            for cmd in lua.drain_commands() {
+                match cmd {
+                    LuaCommand::Play { track, name, looping } => {
+                        let _ = controller
+                            .animation_state
+                            .set_animation_by_name(track, &name, looping);
+                    }
+                    LuaCommand::Add { track, name, looping, delay } => {
+                        let _ = controller
+                            .animation_state
+                            .add_animation_by_name(track, &name, looping, delay);
+                    }
+                    LuaCommand::ClearTrack(track) => {
+                        controller.animation_state.clear_track(track);
+                    }
+                    LuaCommand::Empty { track, mix_duration } => {
+                        controller.animation_state.set_empty_animation(track, mix_duration);
+                    }
+                }
+            }
+        }
+
+        // TOML / default sequence (also runs when Lua feature is present
+        // but no lua_runtime is active, i.e. a .spine.toml or bare skeleton).
+        #[cfg(feature = "lua-scripting")]
+        let use_sequence = self.lua_runtime.borrow().is_none();
+        #[cfg(not(feature = "lua-scripting"))]
+        let use_sequence = true;
+
+        if use_sequence {
+            if let Some(ref mut seq) = *self.anim_sequence.borrow_mut() {
+                seq.advance(controller, dt);
+            }
         }
 
         let renderables = controller.renderables();
