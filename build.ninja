@@ -1,0 +1,120 @@
+ninja_required_version = 1.3
+
+cc = gcc
+cflags = -Wall -Wextra -std=c11 -O2 -Wno-sign-compare -Wno-unused-variable -Wno-unused-but-set-variable -Wno-switch -ffunction-sections -fdata-sections
+defines = -DAPP_VERSION=\"v1.7.29\"
+includes = -I/mnt/g/Casuki_Fedora/proj/PixelTerm-C/include -I/usr/include/chafa -I/usr/lib64/chafa/include -I/usr/include/gdk-pixbuf-2.0 -I/usr/include/glycin-2 -I/usr/include/freetype2 -I/usr/include/libpng16 -I/usr/include/harfbuzz -I/usr/include/libxml2 -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include -DWITH_GZFILEOP -I/usr/include/libmount -I/usr/include/blkid -I/usr/include/sysprof-6 -pthread -I/usr/include/ffmpeg
+ldflags = -Wl,-rpath -Wl,/usr/local/lib -Wl,--gc-sections -Wl,--no-as-needed
+libs = -lchafa -lgdk_pixbuf-2.0 -lgio-2.0 -lgobject-2.0 -lglib-2.0 -lavformat -lavcodec -lswscale -lavutil -lpthread -lm -lz
+
+rule cc
+  command = $cc $defines $cflags $includes -MMD -MF $out.d -c $in -o $out
+  depfile = $out.d
+  description = CC $in
+
+rule link
+  command = $cc $cflags $ldflags -o $out $in $libs
+  description = LINK $out
+
+rule clean
+  command = rm -rf obj bin
+  description = CLEAN
+
+build obj/build.stamp: cc | clean
+  cflags = $cflags
+  defines = $defines
+  includes = $includes
+  ldflags = $ldflags
+  libs = $libs
+  command = echo "PixelTerm-C build configured" > $out
+  description = CONFIGURE
+
+build obj/app.o: cc src/app.c
+build obj/app_book_page_render.o: cc src/app_book_page_render.c
+build obj/app_book_toc.o: cc src/app_book_toc.c
+build obj/app_cli.o: cc src/app_cli.c
+build obj/app_config_runtime.o: cc src/app_config_runtime.c
+build obj/app_core.o: cc src/app_core.c
+build obj/app_file_manager.o: cc src/app_file_manager.c
+build obj/app_file_manager_render.o: cc src/app_file_manager_render.c
+build obj/app_media_session.o: cc src/app_media_session.c
+build obj/app_mode.o: cc src/app_mode.c
+build obj/app_preview_book.o: cc src/app_preview_book.c
+build obj/app_preview_grid.o: cc src/app_preview_grid.c
+build obj/app_preview_render.o: cc src/app_preview_render.c
+build obj/app_preview_shared.o: cc src/app_preview_shared.c
+build obj/app_single_render.o: cc src/app_single_render.c
+build obj/app_single_render_runtime.o: cc src/app_single_render_runtime.c
+build obj/app_startup.o: cc src/app_startup.c
+build obj/book.o: cc src/book.c
+build obj/browser.o: cc src/browser.c
+build obj/common.o: cc src/common.c
+build obj/gif_player.o: cc src/gif_player.c
+build obj/grid_render.o: cc src/grid_render.c
+build obj/input.o: cc src/input.c
+build obj/input_dispatch.o: cc src/input_dispatch.c
+build obj/input_dispatch_book.o: cc src/input_dispatch_book.c
+build obj/input_dispatch_core.o: cc src/input_dispatch_core.c
+build obj/input_dispatch_delete.o: cc src/input_dispatch_delete.c
+build obj/input_dispatch_key_book.o: cc src/input_dispatch_key_book.c
+build obj/input_dispatch_key_file_manager.o: cc src/input_dispatch_key_file_manager.c
+build obj/input_dispatch_key_modes.o: cc src/input_dispatch_key_modes.c
+build obj/input_dispatch_key_single.o: cc src/input_dispatch_key_single.c
+build obj/input_dispatch_media.o: cc src/input_dispatch_media.c
+build obj/input_dispatch_mouse_modes.o: cc src/input_dispatch_mouse_modes.c
+build obj/input_dispatch_pending_clicks.o: cc src/input_dispatch_pending_clicks.c
+build obj/main.o: cc src/main.c
+build obj/media_buffer.o: cc src/media_buffer.c
+build obj/media_utils.o: cc src/media_utils.c
+build obj/pixbuf_utils.o: cc src/pixbuf_utils.c
+build obj/preload_control.o: cc src/preload_control.c
+build obj/preloader.o: cc src/preloader.c
+build obj/process_env.o: cc src/process_env.c
+build obj/renderer.o: cc src/renderer.c
+build obj/terminal_probe.o: cc src/terminal_probe.c
+build obj/terminal_protocol_resolver.o: cc src/terminal_protocol_resolver.c
+build obj/terminal_protocols.o: cc src/terminal_protocols.c
+build obj/text_utils.o: cc src/text_utils.c
+build obj/ui_render_utils.o: cc src/ui_render_utils.c
+build obj/video_player_clock.o: cc src/video_player_clock.c
+build obj/video_player_debug.o: cc src/video_player_debug.c
+build obj/video_player_decode.o: cc src/video_player_decode.c
+build obj/video_player_layout.o: cc src/video_player_layout.c
+build obj/video_player_playback.o: cc src/video_player_playback.c
+build obj/video_player_seek.o: cc src/video_player_seek.c
+build obj/video_player.o: cc src/video_player.c
+build bin/pixelterm: link obj/app.o obj/app_book_page_render.o obj/app_book_toc.o obj/app_cli.o obj/app_config_runtime.o obj/app_core.o obj/app_file_manager.o obj/app_file_manager_render.o obj/app_media_session.o obj/app_mode.o obj/app_preview_book.o obj/app_preview_grid.o obj/app_preview_render.o obj/app_preview_shared.o obj/app_single_render.o obj/app_single_render_runtime.o obj/app_startup.o obj/book.o obj/browser.o obj/common.o obj/gif_player.o obj/grid_render.o obj/input.o obj/input_dispatch.o obj/input_dispatch_book.o obj/input_dispatch_core.o obj/input_dispatch_delete.o obj/input_dispatch_key_book.o obj/input_dispatch_key_file_manager.o obj/input_dispatch_key_modes.o obj/input_dispatch_key_single.o obj/input_dispatch_media.o obj/input_dispatch_mouse_modes.o obj/input_dispatch_pending_clicks.o obj/main.o obj/media_buffer.o obj/media_utils.o obj/pixbuf_utils.o obj/preload_control.o obj/preloader.o obj/process_env.o obj/renderer.o obj/terminal_probe.o obj/terminal_protocol_resolver.o obj/terminal_protocols.o obj/text_utils.o obj/ui_render_utils.o obj/video_player_clock.o obj/video_player_debug.o obj/video_player_decode.o obj/video_player_layout.o obj/video_player_playback.o obj/video_player_seek.o obj/video_player.o
+
+build all: phony bin/pixelterm
+default all
+build obj/test_app_cli.o: cc tests/test_app_cli.c
+build obj/test_app_file_manager.o: cc tests/test_app_file_manager.c
+build obj/test_app_media_session.o: cc tests/test_app_media_session.c
+build obj/test_app_mode.o: cc tests/test_app_mode.c
+build obj/test_app_preview_book.o: cc tests/test_app_preview_book.c
+build obj/test_app_preview_grid.o: cc tests/test_app_preview_grid.c
+build obj/test_app_single_render_integration.o: cc tests/test_app_single_render_integration.c
+build obj/test_app_startup.o: cc tests/test_app_startup.c
+build obj/test_book.o: cc tests/test_book.c
+build obj/test_browser.o: cc tests/test_browser.c
+build obj/test_common.o: cc tests/test_common.c
+build obj/test_gif_player.o: cc tests/test_gif_player.c
+build obj/test_input_dispatch_core.o: cc tests/test_input_dispatch_core.c
+build obj/test_input_dispatch_delete.o: cc tests/test_input_dispatch_delete.c
+build obj/test_input_dispatch_key_book.o: cc tests/test_input_dispatch_key_book.c
+build obj/test_input_dispatch_key_file_manager.o: cc tests/test_input_dispatch_key_file_manager.c
+build obj/test_input_dispatch_key_single.o: cc tests/test_input_dispatch_key_single.c
+build obj/test_input_dispatch_mouse_modes.o: cc tests/test_input_dispatch_mouse_modes.c
+build obj/test_input_dispatch_pending_clicks.o: cc tests/test_input_dispatch_pending_clicks.c
+build obj/test_input_dispatch_support.o: cc tests/test_input_dispatch_support.c
+build obj/test_preloader.o: cc tests/test_preloader.c
+build obj/test_preview_shared.o: cc tests/test_preview_shared.c
+build obj/test_renderer.o: cc tests/test_renderer.c
+build obj/test_terminal_protocols.o: cc tests/test_terminal_protocols.c
+build obj/test_text_utils.o: cc tests/test_text_utils.c
+build obj/test_video_player.o: cc tests/test_video_player.c
+build bin/pixelterm-tests: link obj/test_common.o obj/test_app_cli.o obj/test_app_media_session.o obj/test_app_mode.o obj/test_app_single_render_integration.o obj/test_app_startup.o obj/test_book.o obj/test_browser.o obj/test_gif_player.o obj/test_input_dispatch_core.o obj/test_input_dispatch_delete.o obj/test_input_dispatch_key_book.o obj/test_input_dispatch_key_file_manager.o obj/test_input_dispatch_key_single.o obj/test_input_dispatch_mouse_modes.o obj/test_input_dispatch_pending_clicks.o obj/test_input_dispatch_support.o obj/test_preloader.o obj/test_preview_shared.o obj/test_renderer.o obj/test_terminal_protocols.o obj/test_text_utils.o obj/test_video_player.o obj/common.o obj/browser.o obj/renderer.o obj/gif_player.o obj/input.o obj/text_utils.o obj/process_env.o obj/pixbuf_utils.o obj/media_buffer.o obj/preloader.o obj/app_mode.o obj/input_dispatch_pending_clicks.o obj/input_dispatch_delete.o obj/input_dispatch_core.o obj/input_dispatch_key_single.o obj/input_dispatch_key_book.o obj/input_dispatch_key_file_manager.o obj/input_dispatch_mouse_modes.o obj/app_preview_shared.o obj/app_media_session.o obj/app_single_render.o obj/app_config_runtime.o obj/media_utils.o obj/ui_render_utils.o obj/video_player_clock.o obj/video_player_debug.o obj/video_player_decode.o obj/video_player_layout.o obj/video_player_playback.o obj/video_player_seek.o obj/video_player.o obj/terminal_probe.o obj/terminal_protocols.o obj/terminal_protocol_resolver.o obj/app_cli.o obj/book.o obj/app_startup.o
+build test: phony bin/pixelterm-tests
+build bin/pixelterm-app-file-manager-tests: link obj/test_app_file_manager.o obj/common.o obj/process_env.o obj/app_core.o obj/app_mode.o obj/app_file_manager.o obj/app_file_manager_render.o obj/text_utils.o
+build bin/pixelterm-app-preview-grid-tests: link obj/test_app_preview_grid.o obj/app_preview_grid.o obj/ui_render_utils.o obj/text_utils.o
+build bin/pixelterm-app-preview-book-tests: link obj/test_app_preview_book.o obj/app_preview_book.o
