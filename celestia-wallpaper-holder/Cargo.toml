@@ -1,6 +1,6 @@
 [package]
 name = "celestia-wallpaper-holder"
-version = "1.8.0"
+version = "0.1.2"
 edition = "2021"
 description = "Lean placeholder that holds the wallpaper surface while celestia-wallpaper is stopped"
 

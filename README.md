@@ -123,13 +123,13 @@ sudo cp target/release/celestia-wallpaper-holder /usr/local/bin/
 
 ```bash
 # 生成 tarball
-git archive --prefix=celestia-wallpaper-1.8.0/ -o ~/rpmbuild/SOURCES/celestia-wallpaper-1.8.0.tar.gz HEAD
+git archive --prefix=celestia-wallpaper-0.1.2/ -o ~/rpmbuild/SOURCES/celestia-wallpaper-0.1.2.tar.gz HEAD
 
 # 构建 SRPM
 rpmbuild -bs celestia-wallpaper.spec
 
 # 用 mock 构建 RPM
-mock -r fedora-43-x86_64 --rebuild ~/rpmbuild/SRPMS/celestia-wallpaper-1.8.0-1.fc43.src.rpm
+mock -r fedora-43-x86_64 --rebuild ~/rpmbuild/SRPMS/celestia-wallpaper-0.1.2-1.fc43.src.rpm
 ```
 
 ---

@@ -3,4 +3,5 @@ target/
 *.dat
 *.swp
 *.swo
+build.log
 asstes/web-example/
